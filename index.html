@@ -2,8 +2,16 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <title>Hayley's Game</title>
+  <meta name="theme-color" content="#2f3b52" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Hayley's Game" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icons/icon-180.png" />
+  <link rel="icon" href="icons/icon-192.png" type="image/png" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -35,6 +43,16 @@
 
   <div class="milestone-toast" id="milestoneToast"></div>
 
+  <div class="install-banner" id="installBanner">
+    <img class="install-banner-icon" src="icons/icon-180.png" alt="" />
+    <div class="install-banner-text">
+      Install this game: tap <span class="share-glyph" aria-label="Share">&#x2B06;&#xFE0E;</span>
+      then <strong>Add to Home Screen</strong>
+    </div>
+    <button class="install-banner-close" id="installBannerClose" aria-label="Dismiss">&times;</button>
+  </div>
+
   <script src="app.js"></script>
+  <script src="pwa.js"></script>
 </body>
 </html>
