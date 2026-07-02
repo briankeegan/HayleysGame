@@ -41,9 +41,10 @@ let chain = [];
 let dragging = false;
 let gameOver = false;
 let nextMilestoneIndex = 0;
+let minSpawnTier = 2;
 
 function randomValue() {
-  return Math.random() < 0.9 ? 2 : 4;
+  return Math.random() < 0.9 ? minSpawnTier : minSpawnTier * 2;
 }
 
 function chainSum(ch) {
@@ -82,6 +83,16 @@ function textColorFor(bg) {
   return luminance > 0.6 ? "#2d2d2d" : "#ffffff";
 }
 
+function boardHasValue(value) {
+  return grid.some((row) => row.some((t) => t && t.value === value));
+}
+
+function updateMinSpawnTier() {
+  while (!boardHasValue(minSpawnTier) && minSpawnTier < 2 ** 30) {
+    minSpawnTier *= 2;
+  }
+}
+
 function hasAnyMove() {
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
@@ -116,6 +127,7 @@ function resetGame() {
   chain = [];
   dragging = false;
   nextMilestoneIndex = 0;
+  minSpawnTier = 2;
   overlayEl.classList.remove("visible");
   tilesEl.innerHTML = "";
   tileEls.clear();
@@ -136,6 +148,8 @@ function resumeGame(state) {
   grid = state.grid.map((row) =>
     row.map((v) => (v === null ? null : { id: nextId++, value: v }))
   );
+  minSpawnTier = 2;
+  updateMinSpawnTier();
   const highestTile = grid.flat().reduce((max, t) => (t ? Math.max(max, t.value) : max), 0);
   nextMilestoneIndex = MILESTONES.findIndex((m) => m > highestTile);
   if (nextMilestoneIndex === -1) nextMilestoneIndex = MILESTONES.length;
@@ -402,6 +416,7 @@ function performMerge() {
   chain = [];
   updateChainVisuals();
 
+  updateMinSpawnTier();
   applyGravity();
   renderTiles();
   markPop(mergedId);
