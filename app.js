@@ -23,9 +23,9 @@ const overlayTextEl = document.getElementById("overlayText");
 const playAgainBtn = document.getElementById("playAgainBtn");
 
 const PALETTE = {
-  2: "#eee4da", 4: "#ede0c8", 8: "#f2b179", 16: "#f59563", 32: "#f67c5f",
-  64: "#f65e3b", 128: "#edcf72", 256: "#edcc61", 512: "#edc850",
-  1024: "#edc53f", 2048: "#edc22e",
+  2: "#4fc3f7", 4: "#66bb6a", 8: "#ffa726", 16: "#ef5350", 32: "#ab47bc",
+  64: "#26a69a", 128: "#ec407a", 256: "#ffee58", 512: "#5c6bc0",
+  1024: "#8d6e63", 2048: "#ffd700",
 };
 
 let grid = [];
@@ -48,8 +48,27 @@ function chainSum(ch) {
 
 function valueColor(v) {
   if (PALETTE[v]) return PALETTE[v];
-  const hue = (Math.log2(v) * 35) % 360;
+  const hue = (Math.log2(v) * 61) % 360;
   return `hsl(${hue}, 70%, 55%)`;
+}
+
+function textColorFor(bg) {
+  const m = bg.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+  let r, g, b;
+  if (m) {
+    [r, g, b] = m.slice(1).map((h) => parseInt(h, 16));
+  } else {
+    const hm = bg.match(/hsl\((\d+(?:\.\d+)?),\s*(\d+)%,\s*(\d+)%\)/);
+    const [h, s, l] = [Number(hm[1]) / 360, Number(hm[2]) / 100, Number(hm[3]) / 100];
+    const k = (n) => (n + h * 12) % 12;
+    const a = s * Math.min(l, 1 - l);
+    const f = (n) => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+    r = Math.round(f(0) * 255);
+    g = Math.round(f(8) * 255);
+    b = Math.round(f(4) * 255);
+  }
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.6 ? "#2d2d2d" : "#ffffff";
 }
 
 function hasAnyMove() {
@@ -133,8 +152,9 @@ function tileStyleFor(el, row, col, value) {
   el.style.top = `${row * cellSize + GAP / 2}px`;
   el.style.width = `${cellSize - GAP}px`;
   el.style.height = `${cellSize - GAP}px`;
-  el.style.background = valueColor(value);
-  el.style.color = value <= 4 ? "#776e65" : "#fff";
+  const bg = valueColor(value);
+  el.style.background = bg;
+  el.style.color = textColorFor(bg);
   const digits = String(value).length;
   el.style.fontSize = `${cellSize * (digits >= 4 ? 0.32 : 0.42)}px`;
   el.textContent = String(value);
