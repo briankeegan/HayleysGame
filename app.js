@@ -565,20 +565,17 @@ function triggerLose() {
   clearProgress();
 }
 
-// The whole merge animation targets a constant total length regardless of
-// how many rounds it takes — a simple 2-tile merge (1 round) slows down to
-// fill the full target, while a long chain that needs many rounds divides
-// that same total across all of them (down to MIN_ROUND_MS, so a huge chain
-// still reads as discrete steps instead of a blur) rather than growing
-// linearly with chain length.
-const MERGE_TOTAL_MS = 480;
-const MIN_ROUND_MS = 45;
+// Every merge animation takes exactly this long, full stop — a 2-tile merge
+// (1 round) slows down to fill it, and a 20-tile chain (many rounds) speeds
+// each round up to still land in the same window. Adjust this one number to
+// retune the whole game's merge pacing.
+const MERGE_TOTAL_MS = 610;
 
 function roundDurationFor(roundCount) {
   // There's a pause before the first round shows AND one after the last
   // round finishes (to let it actually be seen before the grid snaps to its
   // final state) — roundCount+1 gaps total for roundCount rounds.
-  return Math.max(MIN_ROUND_MS, MERGE_TOTAL_MS / (roundCount + 1));
+  return MERGE_TOTAL_MS / (roundCount + 1);
 }
 
 // Builds the round-by-round animation plan for a chain, in the exact order
