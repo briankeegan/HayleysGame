@@ -483,12 +483,135 @@ function triggerLose() {
   clearProgress();
 }
 
-const POP_STAGGER_MS = 220;
+const ROUND_MS = 220;
+
+// Builds the round-by-round animation plan for a chain, in the exact order
+// the player dragged it (chainOrder[0] = first tile touched, chainOrder[N-1]
+// = the release point). Every "active" entry always right-aligns against the
+// release point — active[k] always visually sits at chainOrder[N-L+k]'s cell,
+// where L is however many entries remain — so as pairs merge away and the
+// active list shrinks, everything still on the board slides over to close
+// the gap, snake-style. Each round: find the RIGHTMOST adjacent pair with
+// equal values and merge it (the right tile absorbs the left one and its
+// value doubles, in place — not appended to the end); anything to the left of
+// that pair shifts one slot right to stay compact; anything to the right of
+// it was already correctly positioned and doesn't move. Repeat until no
+// adjacent equal pair remains. If more than one entry is left over (or the
+// natural cascade total doesn't land exactly on the rounded final value —
+// e.g. an odd run, or non-equal-but-connectable neighbors), everything left
+// sweeps into the release point, which snaps to the true final value.
+function buildMergeRounds(chainOrder, finalValue) {
+  const N = chainOrder.length;
+  const positions = chainOrder.map((t) => ({ row: t.row, col: t.col }));
+  const slotsFor = (list) => {
+    const L = list.length;
+    return list.map((_, k) => positions[N - L + k]);
+  };
+
+  let active = chainOrder.map((t) => ({ value: t.value, el: tileEls.get(t.id) }));
+  const rounds = [];
+
+  for (;;) {
+    let mergeIdx = -1;
+    for (let i = active.length - 2; i >= 0; i--) {
+      if (active[i].value === active[i + 1].value) {
+        mergeIdx = i;
+        break;
+      }
+    }
+    if (mergeIdx === -1) break;
+
+    const oldSlots = slotsFor(active);
+    const fromEntry = active[mergeIdx];
+    const ontoEntry = active[mergeIdx + 1];
+    const newValue = ontoEntry.value * 2;
+    const newActive = [
+      ...active.slice(0, mergeIdx),
+      { value: newValue, el: ontoEntry.el },
+      ...active.slice(mergeIdx + 2),
+    ];
+    const newSlots = slotsFor(newActive);
+
+    const moves = [];
+    for (let k = 0; k < newActive.length; k++) {
+      if (k === mergeIdx) continue;
+      const entry = newActive[k];
+      const oldSlot = oldSlots[active.indexOf(entry)];
+      const newSlot = newSlots[k];
+      if (oldSlot.row !== newSlot.row || oldSlot.col !== newSlot.col) {
+        moves.push({ type: "shift", el: entry.el, row: newSlot.row, col: newSlot.col });
+      }
+    }
+    moves.push({
+      type: "merge",
+      fromEl: fromEntry.el,
+      ontoEl: ontoEntry.el,
+      row: newSlots[mergeIdx].row,
+      col: newSlots[mergeIdx].col,
+      value: newValue,
+    });
+
+    rounds.push(moves);
+    active = newActive;
+  }
+
+  if (active.length > 1 || active[0].value !== finalValue) {
+    const survivor = active[active.length - 1];
+    const survivorSlot = positions[N - 1];
+    const moves = [];
+    for (let k = 0; k < active.length - 1; k++) {
+      moves.push({
+        type: "sweep",
+        fromEl: active[k].el,
+        row: survivorSlot.row,
+        col: survivorSlot.col,
+      });
+    }
+    moves.push({ type: "snap", el: survivor.el, value: finalValue });
+    rounds.push(moves);
+  }
+
+  return rounds;
+}
+
+function applyMove(move) {
+  switch (move.type) {
+    case "shift": {
+      move.el.style.left = `${move.col * cellSize + GAP / 2}px`;
+      move.el.style.top = `${move.row * cellSize + GAP / 2}px`;
+      break;
+    }
+    case "merge": {
+      move.fromEl.style.left = `${move.col * cellSize + GAP / 2}px`;
+      move.fromEl.style.top = `${move.row * cellSize + GAP / 2}px`;
+      move.fromEl.classList.add("removing");
+      move.ontoEl.textContent = String(move.value);
+      const bg = valueColor(move.value);
+      move.ontoEl.style.background = bg;
+      move.ontoEl.style.color = textColorFor(bg);
+      markPopEl(move.ontoEl);
+      break;
+    }
+    case "sweep": {
+      move.fromEl.style.left = `${move.col * cellSize + GAP / 2}px`;
+      move.fromEl.style.top = `${move.row * cellSize + GAP / 2}px`;
+      move.fromEl.classList.add("removing");
+      break;
+    }
+    case "snap": {
+      move.el.textContent = String(move.value);
+      const bg = valueColor(move.value);
+      move.el.style.background = bg;
+      move.el.style.color = textColorFor(bg);
+      markPopEl(move.el);
+      break;
+    }
+  }
+}
 
 function performMerge() {
   const chainOrder = chain.map((t) => ({ ...t, id: grid[t.row][t.col].id }));
   const last = chainOrder[chainOrder.length - 1];
-  const lastEl = tileEls.get(last.id);
   const finalValue = closestPowerOfTwo(chainSum(chainOrder));
 
   chain = [];
@@ -496,59 +619,7 @@ function performMerge() {
   hideHoverRing();
   boardAnimating = true;
 
-  // Replay a natural cascading pairwise merge, in the order the tiles were
-  // touched: each tile merges with the running value it's carrying if the
-  // next tile matches, with the merge happening at the position of whichever
-  // tile is currently being processed (2+2 becomes 4 at the SECOND tile's
-  // spot, then that 4 + the next 4 becomes 8 at the THIRD tile's spot) —
-  // not everything piling onto the release point at once.
-  const stack = [];
-  const steps = [];
-  for (const t of chainOrder) {
-    let cur = { value: t.value, el: tileEls.get(t.id) };
-    while (stack.length && stack[stack.length - 1].value === cur.value) {
-      const prev = stack.pop();
-      steps.push({ fromEl: prev.el, ontoEl: cur.el, displayValue: cur.value * 2 });
-      cur = { value: cur.value * 2, el: cur.el };
-    }
-    stack.push(cur);
-  }
-
-  // The stack doesn't always collapse to a single entry (e.g. an odd-length
-  // same-value run leaves a leftover), and the natural cascade total doesn't
-  // always equal the rounded sum — anything left over visually collapses
-  // into the release point, which always ends up showing the true final value.
-  for (const entry of stack) {
-    if (entry.el !== lastEl) {
-      steps.push({ fromEl: entry.el, ontoEl: lastEl, displayValue: finalValue });
-    }
-  }
-  const finalStep = steps[steps.length - 1];
-  if (!finalStep || finalStep.ontoEl !== lastEl || finalStep.displayValue !== finalValue) {
-    steps.push({ fromEl: null, ontoEl: lastEl, displayValue: finalValue });
-  }
-
-  let stepIndex = 0;
-  function playNextStep() {
-    if (stepIndex >= steps.length) {
-      finishMerge();
-      return;
-    }
-    const step = steps[stepIndex++];
-    if (step.fromEl && step.ontoEl) {
-      step.fromEl.style.left = step.ontoEl.style.left;
-      step.fromEl.style.top = step.ontoEl.style.top;
-      step.fromEl.classList.add("removing");
-    }
-    if (step.ontoEl) {
-      step.ontoEl.textContent = String(step.displayValue);
-      const bg = valueColor(step.displayValue);
-      step.ontoEl.style.background = bg;
-      step.ontoEl.style.color = textColorFor(bg);
-      markPopEl(step.ontoEl);
-    }
-    setTimeout(playNextStep, POP_STAGGER_MS);
-  }
+  const rounds = buildMergeRounds(chainOrder, finalValue);
 
   function finishMerge() {
     for (const t of chainOrder) grid[t.row][t.col] = null;
@@ -574,7 +645,17 @@ function performMerge() {
     saveProgress();
   }
 
-  setTimeout(playNextStep, POP_STAGGER_MS);
+  let roundIndex = 0;
+  function playNextRound() {
+    if (roundIndex >= rounds.length) {
+      finishMerge();
+      return;
+    }
+    for (const move of rounds[roundIndex++]) applyMove(move);
+    setTimeout(playNextRound, ROUND_MS);
+  }
+
+  setTimeout(playNextRound, ROUND_MS);
 }
 
 function endDrag(e) {
