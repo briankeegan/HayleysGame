@@ -27,6 +27,19 @@
     .club-header { position: relative; }
     .club-header h1 { margin: 0; font-size: 1.15rem; }
     .club-header .sub { font-size: 0.72rem; opacity: 0.75; margin-top: 2px; }
+    .game-btn {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+      text-decoration: none;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 7px 12px;
+      border-radius: 8px;
+    }
     .logout-btn {
       position: absolute;
       right: 12px;
@@ -196,6 +209,7 @@
 </head>
 <body>
   <header class="club-header">
+    <a class="game-btn" href="./">🎮 Game</a>
     <button class="logout-btn" id="logoutBtn" hidden>Leave</button>
     <h1>🏰 The Clubhouse</h1>
     <div class="sub">a secret place to talk about Hayley's Game</div>

@@ -1,9 +1,11 @@
-const CACHE_NAME = 'hayleys-game-v1';
+const CACHE_NAME = 'hayleys-game-v2';
 const ASSETS = [
   './',
   './index.html',
   './style.css',
   './app.js',
+  './pwa.js',
+  './clubhouse.html',
   './manifest.webmanifest',
   './icons/icon-180.png',
   './icons/icon-192.png',
