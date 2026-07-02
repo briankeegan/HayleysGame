@@ -252,6 +252,20 @@ body {
   transform: translate(-50%, 0);
 }
 
+/* Invisible clubhouse entrance: triple-tap the top-right corner. */
+.secret-door {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 56px;
+  height: calc(56px + env(safe-area-inset-top));
+  background: transparent;
+  border: none;
+  padding: 0;
+  z-index: 400;
+  -webkit-tap-highlight-color: transparent;
+}
+
 .install-banner {
   position: fixed;
   left: 12px;

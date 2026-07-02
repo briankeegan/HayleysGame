@@ -5,6 +5,25 @@
     });
   }
 
+  // Secret clubhouse entrance: triple-tap the invisible top-right corner.
+  var secretDoor = document.getElementById('secretDoor');
+  if (secretDoor) {
+    var taps = 0;
+    var tapTimer = null;
+    secretDoor.addEventListener('click', function () {
+      taps++;
+      clearTimeout(tapTimer);
+      if (taps >= 3) {
+        taps = 0;
+        window.location.href = 'clubhouse.html';
+        return;
+      }
+      tapTimer = setTimeout(function () {
+        taps = 0;
+      }, 1500);
+    });
+  }
+
   var banner = document.getElementById('installBanner');
   var bannerText = document.getElementById('installBannerText');
   var installBtn = document.getElementById('installBannerBtn');
