@@ -19,7 +19,7 @@
 
     .club-header {
       flex: 0 0 auto;
-      padding: max(10px, env(safe-area-inset-top)) 16px 12px;
+      padding: max(10px, env(safe-area-inset-top)) 80px 12px;
       background: #2f3b52;
       color: #fff;
       text-align: center;
@@ -54,22 +54,26 @@
       border-radius: 8px;
       cursor: pointer;
     }
-    .secret-field { position: relative; }
-    .secret-field input { padding-right: 46px; }
+    .secret-field { position: relative; margin: 0 0 12px; }
+    .secret-field input { margin: 0; padding-right: 44px; }
     .secret-field button {
       position: absolute;
-      right: 4px;
-      top: 4px;
-      bottom: 16px;
-      width: 38px;
+      right: 6px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       border: none;
-      border-radius: 7px;
-      background: #eee4da;
-      font-size: 1rem;
+      background: transparent;
+      color: #9a8f85;
       cursor: pointer;
       padding: 0;
     }
-    .secret-field button.peeking { background: #f2b179; }
+    .secret-field button svg { width: 20px; height: 20px; }
+    .secret-field button svg[hidden] { display: none; }
 
     /* ---- entry gate ---- */
     .gate {
@@ -101,7 +105,7 @@
       background: #faf8ef;
       color: #2f3b52;
     }
-    .gate-panel button {
+    .gate-panel > button {
       width: 100%;
       background: #f2b179;
       border: none;
@@ -222,7 +226,18 @@
       <input id="nameInput" type="text" placeholder="Your name" autocomplete="off" maxlength="40" />
       <div class="secret-field">
         <input id="secretInput" type="password" placeholder="Secret word" autocomplete="off" maxlength="60" />
-        <button id="peekBtn" type="button" aria-label="Show secret word">👁</button>
+        <button id="peekBtn" type="button" aria-label="Show secret word">
+          <svg id="eyeOpen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+          <svg id="eyeClosed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" hidden>
+            <path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a20.66 20.66 0 0 1 5.06-5.94"/>
+            <path d="M9.9 4.24A10.94 10.94 0 0 1 12 5c7 0 11 7 11 7a20.8 20.8 0 0 1-3.22 4.19"/>
+            <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/>
+            <line x1="1" y1="1" x2="23" y2="23"/>
+          </svg>
+        </button>
       </div>
       <button id="enterBtn">Enter the clubhouse</button>
       <div class="gate-error" id="gateError"></div>
@@ -280,11 +295,25 @@
     var logoutBtn = document.getElementById("logoutBtn");
     var peekBtn = document.getElementById("peekBtn");
 
+    var eyeOpen = document.getElementById("eyeOpen");
+    var eyeClosed = document.getElementById("eyeClosed");
+
+    // SVG elements don't support the .hidden property — toggle the attribute.
+    function setPeekIcons(showing) {
+      if (showing) {
+        eyeOpen.setAttribute("hidden", "");
+        eyeClosed.removeAttribute("hidden");
+      } else {
+        eyeClosed.setAttribute("hidden", "");
+        eyeOpen.removeAttribute("hidden");
+      }
+      peekBtn.setAttribute("aria-label", showing ? "Hide secret word" : "Show secret word");
+    }
+
     peekBtn.addEventListener("click", function () {
-      var showing = secretInput.type === "text";
-      secretInput.type = showing ? "password" : "text";
-      peekBtn.classList.toggle("peeking", !showing);
-      peekBtn.setAttribute("aria-label", showing ? "Show secret word" : "Hide secret word");
+      var show = secretInput.type === "password";
+      secretInput.type = show ? "text" : "password";
+      setPeekIcons(show);
     });
 
     function openClubhouse(name, secret) {
@@ -352,7 +381,7 @@
       nameInput.value = "";
       secretInput.value = "";
       secretInput.type = "password";
-      peekBtn.classList.remove("peeking");
+      setPeekIcons(false);
     });
 
     // Walk straight in if this device already knows the secret handshake.
