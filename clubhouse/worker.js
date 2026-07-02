@@ -75,7 +75,12 @@ export default {
         }
       );
       if (!res.ok) {
-        return json(502, { error: `github said ${res.status}` });
+        let detail = "";
+        try {
+          const body = await res.json();
+          detail = body.message ? ` — ${body.message}` : "";
+        } catch {}
+        return json(502, { error: `github said ${res.status}${detail}` });
       }
       return json(200, { ok: true });
     }
