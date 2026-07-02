@@ -40,6 +40,7 @@ let best = Number(localStorage.getItem(BEST_SCORE_KEY)) || 0;
 let chain = [];
 let dragging = false;
 let gameOver = false;
+let boardAnimating = false;
 let nextMilestoneIndex = 0;
 let minSpawnTier = 2;
 
@@ -80,11 +81,24 @@ function chainSum(ch) {
   return highest;
 }
 
-// A tile can extend a chain onto a preceding tile of value `prevValue` only if
-// it repeats that same value (2-2-2-2...) or is exactly double it (2-2-4-8...);
-// runs of more than 2 equal tiles are allowed before the value has to "level up".
-function canFollow(prevValue, nextValue) {
-  return nextValue === prevValue || nextValue === prevValue * 2;
+// The value the chain has cascaded up to so far, as if it ended right here —
+// same cascading pairwise-merge as chainSum(), except a single tile's "value
+// so far" is just its own face value (chainSum returns 0 for a lone tile,
+// since no merge has happened yet).
+function cascadeValueSoFar(chainSoFar) {
+  return chainSoFar.length === 1 ? chainSoFar[0].value : chainSum(chainSoFar);
+}
+
+// A tile can extend a chain if it repeats the immediately-preceding tile's
+// raw value (2-2-2-2... indefinitely), OR matches the value the chain has
+// already cascaded up to (2-2-2-2 cascades to 8, so an 8 can follow even
+// though the preceding raw tile was still a 2). The very first connection
+// must be an exact match either way: 2-4 alone is not a valid 2-tile chain
+// (cascade-so-far for a lone 2 is just 2), but 2-2-4 is, since the escalation
+// to 4 only happens after the initial 2-2 pairing produces a cascade value of 4.
+function canFollow(chainSoFar, nextValue) {
+  const last = chainSoFar[chainSoFar.length - 1];
+  return nextValue === last.value || nextValue === cascadeValueSoFar(chainSoFar);
 }
 
 function valueColor(v) {
@@ -314,8 +328,7 @@ function renderTiles(animateNew, skipDropInId) {
   }
 }
 
-function markPop(id) {
-  const el = tileEls.get(id);
+function markPopEl(el) {
   if (!el) return;
   el.classList.remove("pop");
   // eslint-disable-next-line no-unused-expressions
@@ -446,32 +459,91 @@ function triggerLose() {
   clearProgress();
 }
 
+const POP_STAGGER_MS = 220;
+
 function performMerge() {
   const finalValue = chainSum(chain);
-  const last = chain[chain.length - 1];
-
-  for (const t of chain) grid[t.row][t.col] = null;
-
-  const mergedId = nextId++;
-  grid[last.row][last.col] = { id: mergedId, value: finalValue };
-  score += finalValue;
-  updateScoreDisplay();
+  const chainOrder = chain.map((t) => ({ ...t, id: grid[t.row][t.col].id }));
+  const last = chainOrder[chainOrder.length - 1];
+  const lastEl = tileEls.get(last.id);
 
   chain = [];
   updateChainVisuals();
+  hideHoverRing();
+  boardAnimating = true;
 
-  updateMinSpawnTier();
-  applyGravity();
-  renderTiles(true, mergedId);
-  markPop(mergedId);
-
-  checkMilestone(finalValue);
-
-  if (!hasAnyMove()) {
-    triggerLose();
-    return;
+  // Replay the same cascading pairwise-merge algorithm as chainSum(), but this
+  // time tracking DOM elements so we can animate each pairwise merge visually,
+  // in order, as it happens (2+2 -> 4, then that 4 + the next 4 -> 8, ...).
+  const stack = [];
+  const steps = [];
+  for (const t of chainOrder) {
+    let cur = { value: t.value, el: tileEls.get(t.id) };
+    while (stack.length && stack[stack.length - 1].value === cur.value) {
+      const prev = stack.pop();
+      steps.push({ fromEl: prev.el, ontoEl: cur.el, newValue: cur.value * 2 });
+      cur = { value: cur.value * 2, el: cur.el };
+    }
+    stack.push(cur);
   }
-  saveProgress();
+
+  // The stack doesn't always collapse to a single entry (e.g. an odd-length
+  // same-value run like 2-2-2 leaves one leftover) — anything not already
+  // sitting on lastEl visually collapses into it, so the result always ends
+  // up displayed exactly where the player released their finger.
+  for (const entry of stack) {
+    if (entry.el !== lastEl) {
+      steps.push({ fromEl: entry.el, ontoEl: lastEl, newValue: finalValue });
+    }
+  }
+  const finalStep = steps[steps.length - 1];
+  if (!finalStep || finalStep.ontoEl !== lastEl || finalStep.newValue !== finalValue) {
+    steps.push({ fromEl: null, ontoEl: lastEl, newValue: finalValue });
+  }
+
+  let stepIndex = 0;
+  function playNextStep() {
+    if (stepIndex >= steps.length) {
+      finishMerge();
+      return;
+    }
+    const step = steps[stepIndex++];
+    if (step.fromEl && step.ontoEl) {
+      step.fromEl.style.left = step.ontoEl.style.left;
+      step.fromEl.style.top = step.ontoEl.style.top;
+      step.fromEl.classList.add("removing");
+    }
+    if (step.ontoEl) {
+      step.ontoEl.textContent = String(step.newValue);
+      const bg = valueColor(step.newValue);
+      step.ontoEl.style.background = bg;
+      step.ontoEl.style.color = textColorFor(bg);
+      markPopEl(step.ontoEl);
+    }
+    setTimeout(playNextStep, POP_STAGGER_MS);
+  }
+
+  function finishMerge() {
+    for (const t of chainOrder) grid[t.row][t.col] = null;
+    grid[last.row][last.col] = { id: last.id, value: finalValue };
+    score += finalValue;
+    updateScoreDisplay();
+
+    updateMinSpawnTier();
+    applyGravity();
+    renderTiles(true, last.id);
+
+    checkMilestone(finalValue);
+    boardAnimating = false;
+
+    if (!hasAnyMove()) {
+      triggerLose();
+      return;
+    }
+    saveProgress();
+  }
+
+  setTimeout(playNextStep, POP_STAGGER_MS);
 }
 
 function endDrag(e) {
@@ -490,7 +562,7 @@ function endDrag(e) {
 }
 
 gridEl.addEventListener("pointerdown", (e) => {
-  if (gameOver) return;
+  if (gameOver || boardAnimating) return;
   const cell = cellFromEvent(e);
   if (!cell) return;
   const tile = grid[cell.row][cell.col];
@@ -532,7 +604,7 @@ gridEl.addEventListener("pointermove", (e) => {
 
     const lastRowDist = Math.abs(c.row - last.row);
     const lastColDist = Math.abs(c.col - last.col);
-    if (lastRowDist <= 1 && lastColDist <= 1 && tile && canFollow(last.value, tile.value)) {
+    if (lastRowDist <= 1 && lastColDist <= 1 && tile && canFollow(chain, tile.value)) {
       chain.push({ row: c.row, col: c.col, value: tile.value });
       break;
     }
@@ -544,7 +616,7 @@ gridEl.addEventListener("pointermove", (e) => {
       const anchor = chain[chain.length - 2];
       const anchorRowDist = Math.abs(c.row - anchor.row);
       const anchorColDist = Math.abs(c.col - anchor.col);
-      if (anchorRowDist <= 1 && anchorColDist <= 1 && tile && canFollow(anchor.value, tile.value)) {
+      if (anchorRowDist <= 1 && anchorColDist <= 1 && tile && canFollow(chain.slice(0, -1), tile.value)) {
         chain[chain.length - 1] = { row: c.row, col: c.col, value: tile.value };
         break;
       }
