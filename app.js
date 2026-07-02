@@ -204,6 +204,29 @@ function cellFromEvent(e) {
   return { row, col };
 }
 
+// Returns nearby grid cells (the touched cell plus its 8 neighbors) sorted by
+// distance to the raw pointer position. Diagonal drags land near a tile corner
+// more often than straight drags do, so a little tolerance there goes a long
+// way toward matching what a finger actually intended to touch.
+function cellCandidates(x, y) {
+  const baseCol = Math.floor(x / cellSize);
+  const baseRow = Math.floor(y / cellSize);
+  const candidates = [];
+  for (let dr = -1; dr <= 1; dr++) {
+    for (let dc = -1; dc <= 1; dc++) {
+      const row = baseRow + dr;
+      const col = baseCol + dc;
+      if (row < 0 || row >= ROWS || col < 0 || col >= COLS) continue;
+      const cx = col * cellSize + cellSize / 2;
+      const cy = row * cellSize + cellSize / 2;
+      const dist = (x - cx) * (x - cx) + (y - cy) * (y - cy);
+      candidates.push({ row, col, dist });
+    }
+  }
+  candidates.sort((a, b) => a.dist - b.dist);
+  return candidates;
+}
+
 function updateChainVisuals(pointer) {
   for (const el of tileEls.values()) el.classList.remove("selected");
   for (const t of chain) {
@@ -322,51 +345,36 @@ gridEl.addEventListener("pointerdown", (e) => {
 
 gridEl.addEventListener("pointermove", (e) => {
   if (!dragging) return;
-  const cell = cellFromEvent(e);
-  if (!cell) {
-    updateChainVisuals(e);
-    return;
-  }
+
+  const rect = gridEl.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
 
   const last = chain[chain.length - 1];
-  if (cell.row === last.row && cell.col === last.col) {
-    updateChainVisuals(e);
-    return;
-  }
+  const prev = chain.length >= 2 ? chain[chain.length - 2] : null;
+  const candidates = cellCandidates(x, y);
 
-  if (chain.length >= 2) {
-    const prev = chain[chain.length - 2];
-    if (cell.row === prev.row && cell.col === prev.col) {
-      chain.pop();
-      updateChainVisuals(e);
-      return;
+  for (const c of candidates) {
+    if (c.row === last.row && c.col === last.col) {
+      break;
     }
+    if (prev && c.row === prev.row && c.col === prev.col) {
+      chain.pop();
+      break;
+    }
+
+    const rowDist = Math.abs(c.row - last.row);
+    const colDist = Math.abs(c.col - last.col);
+    if (rowDist > 1 || colDist > 1) continue;
+    if (chain.some((t) => t.row === c.row && t.col === c.col)) continue;
+
+    const tile = grid[c.row][c.col];
+    if (!tile || tile.value !== chainSum(chain)) continue;
+
+    chain.push({ row: c.row, col: c.col, value: tile.value });
+    break;
   }
 
-  const rowDist = Math.abs(cell.row - last.row);
-  const colDist = Math.abs(cell.col - last.col);
-  if (rowDist > 1 || colDist > 1) {
-    updateChainVisuals(e);
-    return;
-  }
-
-  if (chain.some((t) => t.row === cell.row && t.col === cell.col)) {
-    updateChainVisuals(e);
-    return;
-  }
-
-  const tile = grid[cell.row][cell.col];
-  if (!tile) {
-    updateChainVisuals(e);
-    return;
-  }
-
-  if (tile.value !== chainSum(chain)) {
-    updateChainVisuals(e);
-    return;
-  }
-
-  chain.push({ row: cell.row, col: cell.col, value: tile.value });
   updateChainVisuals(e);
 });
 
