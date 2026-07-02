@@ -510,9 +510,16 @@
       sendBtn.textContent = "Sending…";
       relay({ action: "post", name: visitorName, secret: secretWord, message: text })
         .then(function (res) {
-          if (res.status === 403) throw new Error("wrong-secret");
-          if (!res.ok) throw new Error("relay");
+          return res
+            .json()
+            .catch(function () { return {}; })
+            .then(function (data) { return { res: res, data: data }; });
+        })
+        .then(function (r) {
+          if (r.res.status === 403) throw new Error("wrong-secret");
+          if (!r.res.ok) throw new Error(r.data.error || "relay error " + r.res.status);
           messageInput.value = "";
+          messageInput.style.height = "auto";
           // Show it immediately; the next refresh replaces it with the real one.
           lastRenderKey = "";
           var bubble = document.createElement("div");
@@ -532,7 +539,7 @@
           alert(
             err.message === "wrong-secret"
               ? "The secret word stopped working — reload the page and try again."
-              : "Your message didn't go through. Try again in a moment."
+              : "Your message didn't go through.\n\nWhat the relay said: " + err.message
           );
         })
         .finally(function () {
@@ -541,11 +548,11 @@
         });
     });
 
-    messageInput.addEventListener("keydown", function (e) {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        sendBtn.click();
-      }
+    // Enter makes a new line (multi-line messages welcome); only the Send
+    // button sends. The box grows with the message up to its max height.
+    messageInput.addEventListener("input", function () {
+      messageInput.style.height = "auto";
+      messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + "px";
     });
   </script>
 </body>
