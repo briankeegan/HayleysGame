@@ -173,6 +173,40 @@
     .thinking.visible { display: block; }
     .thread-status { text-align: center; color: #bbada0; font-size: 0.75rem; padding: 4px 0 8px; }
 
+    .send-error {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #ef5350;
+      color: #fff;
+      font-size: 0.8rem;
+      line-height: 1.4;
+      padding: 10px 12px;
+      max-width: 640px;
+      width: calc(100% - 24px);
+      margin: 0 auto 6px;
+      border-radius: 10px;
+    }
+    .send-error[hidden] { display: none; }
+    .send-error-text {
+      flex: 1 1 auto;
+      overflow-wrap: break-word;
+      min-width: 0;
+      user-select: text;
+      -webkit-user-select: text;
+    }
+    .send-error button {
+      flex: 0 0 auto;
+      border: none;
+      border-radius: 7px;
+      background: rgba(255, 255, 255, 0.2);
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.8rem;
+      padding: 7px 10px;
+      cursor: pointer;
+    }
+
     /* ---- composer ---- */
     .composer {
       flex: 0 0 auto;
@@ -247,6 +281,11 @@
   <div class="thread-wrap" id="threadWrap">
     <div class="thread" id="thread">
       <div class="thread-status" id="threadStatus">opening the clubhouse door…</div>
+    </div>
+    <div class="send-error" id="sendError" hidden>
+      <div class="send-error-text" id="sendErrorText"></div>
+      <button id="copyErrorBtn" type="button">Copy</button>
+      <button id="dismissErrorBtn" type="button" aria-label="Dismiss">&times;</button>
     </div>
     <div class="composer">
       <textarea id="messageInput" placeholder="Write your ideas here…" maxlength="4000"></textarea>
@@ -520,6 +559,7 @@
           if (!r.res.ok) throw new Error(r.data.error || "relay error " + r.res.status);
           messageInput.value = "";
           messageInput.style.height = "auto";
+          sendErrorEl.hidden = true;
           // Show it immediately; the next refresh replaces it with the real one.
           lastRenderKey = "";
           var bubble = document.createElement("div");
@@ -536,16 +576,52 @@
           fastPollUntil = Date.now() + 10 * 60 * 1000;
         })
         .catch(function (err) {
-          alert(
+          showSendError(
             err.message === "wrong-secret"
               ? "The secret word stopped working — reload the page and try again."
-              : "Your message didn't go through.\n\nWhat the relay said: " + err.message
+              : "Message didn't go through. Relay said: " + err.message
           );
         })
         .finally(function () {
           sendBtn.disabled = false;
           sendBtn.textContent = "Send";
         });
+    });
+
+    var sendErrorEl = document.getElementById("sendError");
+    var sendErrorTextEl = document.getElementById("sendErrorText");
+    var copyErrorBtn = document.getElementById("copyErrorBtn");
+    var dismissErrorBtn = document.getElementById("dismissErrorBtn");
+
+    function showSendError(msg) {
+      sendErrorTextEl.textContent = msg;
+      sendErrorEl.hidden = false;
+      copyErrorBtn.textContent = "Copy";
+    }
+
+    copyErrorBtn.addEventListener("click", function () {
+      var text = sendErrorTextEl.textContent;
+      var done = function () { copyErrorBtn.textContent = "Copied!"; };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text, done); });
+      } else {
+        fallbackCopy(text, done);
+      }
+    });
+
+    function fallbackCopy(text, done) {
+      var ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); done(); } catch (e) {}
+      ta.remove();
+    }
+
+    dismissErrorBtn.addEventListener("click", function () {
+      sendErrorEl.hidden = true;
     });
 
     // Enter makes a new line (multi-line messages welcome); only the Send
