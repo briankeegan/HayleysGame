@@ -295,7 +295,7 @@ gridEl.addEventListener("pointerdown", (e) => {
   if (!tile) return;
 
   dragging = true;
-  chain = [{ row: cell.row, col: cell.col }];
+  chain = [{ row: cell.row, col: cell.col, value: tile.value }];
   gridEl.setPointerCapture(e.pointerId);
   updateChainVisuals(e);
 });
@@ -346,7 +346,7 @@ gridEl.addEventListener("pointermove", (e) => {
     return;
   }
 
-  chain.push({ row: cell.row, col: cell.col });
+  chain.push({ row: cell.row, col: cell.col, value: tile.value });
   updateChainVisuals(e);
 });
 
