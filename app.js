@@ -565,7 +565,21 @@ function triggerLose() {
   clearProgress();
 }
 
-const ROUND_MS = 220;
+// The whole merge animation targets a constant total length regardless of
+// how many rounds it takes — a simple 2-tile merge (1 round) slows down to
+// fill the full target, while a long chain that needs many rounds divides
+// that same total across all of them (down to MIN_ROUND_MS, so a huge chain
+// still reads as discrete steps instead of a blur) rather than growing
+// linearly with chain length.
+const MERGE_TOTAL_MS = 480;
+const MIN_ROUND_MS = 45;
+
+function roundDurationFor(roundCount) {
+  // There's a pause before the first round shows AND one after the last
+  // round finishes (to let it actually be seen before the grid snaps to its
+  // final state) — roundCount+1 gaps total for roundCount rounds.
+  return Math.max(MIN_ROUND_MS, MERGE_TOTAL_MS / (roundCount + 1));
+}
 
 // Builds the round-by-round animation plan for a chain, in the exact order
 // the player dragged it (chainOrder[0] = first tile touched, chainOrder[N-1]
@@ -702,6 +716,7 @@ function performMerge() {
   boardAnimating = true;
 
   const rounds = buildMergeRounds(chainOrder, finalValue);
+  const roundMs = roundDurationFor(Math.max(1, rounds.length));
 
   function finishMerge() {
     for (const t of chainOrder) grid[t.row][t.col] = null;
@@ -734,10 +749,10 @@ function performMerge() {
       return;
     }
     for (const move of rounds[roundIndex++]) applyMove(move);
-    setTimeout(playNextRound, ROUND_MS);
+    setTimeout(playNextRound, roundMs);
   }
 
-  setTimeout(playNextRound, ROUND_MS);
+  setTimeout(playNextRound, roundMs);
 }
 
 function endDrag(e) {
