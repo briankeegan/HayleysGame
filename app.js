@@ -1,7 +1,7 @@
 const COLS = 5;
 const ROWS = 8;
 const GAP = 4;
-const WIN_VALUE = 2248;
+const MILESTONES = [2248, 4096, 8192, 16384, 32768, 65536, 131072];
 const BEST_SCORE_KEY = "hayleysgame_best";
 const STATE_KEY = "hayleysgame_state";
 const DIRS = [
@@ -23,6 +23,7 @@ const overlayEl = document.getElementById("overlay");
 const overlayTitleEl = document.getElementById("overlayTitle");
 const overlayTextEl = document.getElementById("overlayText");
 const playAgainBtn = document.getElementById("playAgainBtn");
+const milestoneToastEl = document.getElementById("milestoneToast");
 
 const PALETTE = {
   2: "#4fc3f7", 4: "#66bb6a", 8: "#ffa726", 16: "#ef5350", 32: "#ab47bc",
@@ -39,6 +40,7 @@ let best = Number(localStorage.getItem(BEST_SCORE_KEY)) || 0;
 let chain = [];
 let dragging = false;
 let gameOver = false;
+let nextMilestoneIndex = 0;
 
 function randomValue() {
   return Math.random() < 0.9 ? 2 : 4;
@@ -113,6 +115,7 @@ function resetGame() {
   score = 0;
   chain = [];
   dragging = false;
+  nextMilestoneIndex = 0;
   overlayEl.classList.remove("visible");
   tilesEl.innerHTML = "";
   tileEls.clear();
@@ -133,6 +136,9 @@ function resumeGame(state) {
   grid = state.grid.map((row) =>
     row.map((v) => (v === null ? null : { id: nextId++, value: v }))
   );
+  const highestTile = grid.flat().reduce((max, t) => (t ? Math.max(max, t.value) : max), 0);
+  nextMilestoneIndex = MILESTONES.findIndex((m) => m > highestTile);
+  if (nextMilestoneIndex === -1) nextMilestoneIndex = MILESTONES.length;
   updateScoreDisplay();
   layout();
 }
@@ -353,12 +359,22 @@ function applyGravity() {
   }
 }
 
-function triggerWin() {
-  gameOver = true;
-  overlayTitleEl.textContent = "You Win!";
-  overlayTextEl.textContent = `You reached ${WIN_VALUE}! Final score: ${score}.`;
-  overlayEl.classList.add("visible");
-  clearProgress();
+let toastTimer = null;
+
+function showMilestoneToast(value) {
+  milestoneToastEl.textContent = `${value} reached!`;
+  milestoneToastEl.classList.add("visible");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    milestoneToastEl.classList.remove("visible");
+  }, 2200);
+}
+
+function checkMilestone(value) {
+  while (nextMilestoneIndex < MILESTONES.length && value >= MILESTONES[nextMilestoneIndex]) {
+    showMilestoneToast(MILESTONES[nextMilestoneIndex]);
+    nextMilestoneIndex++;
+  }
 }
 
 function triggerLose() {
@@ -387,10 +403,8 @@ function performMerge() {
   renderTiles();
   markPop(mergedId);
 
-  if (finalValue >= WIN_VALUE) {
-    triggerWin();
-    return;
-  }
+  checkMilestone(finalValue);
+
   if (!hasAnyMove()) {
     triggerLose();
     return;
