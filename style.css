@@ -252,11 +252,11 @@ body {
   transform: translate(-50%, 0);
 }
 
-/* Invisible clubhouse entrance: triple-tap the top-right corner. */
+/* Invisible clubhouse entrance: triple-tap the top-left corner. */
 .secret-door {
   position: fixed;
   top: 0;
-  right: 0;
+  left: 0;
   width: 56px;
   height: calc(56px + env(safe-area-inset-top));
   background: transparent;
