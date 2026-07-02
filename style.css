@@ -97,6 +97,7 @@ body {
 .chain-line {
   pointer-events: none;
   overflow: visible;
+  z-index: 6;
 }
 
 .hover-ring {
@@ -141,8 +142,9 @@ body {
 }
 
 .tile.selected {
-  box-shadow: 0 0 0 3px #fff, 0 0 0 6px rgba(255, 255, 255, 0.55);
-  transform: scale(1.06);
+  /* The chain-line's per-tile ring (drawn above at z-index 6) is the
+     selection indicator now — this just keeps selected tiles' numbers
+     crisp above their neighbors, without a second competing outline. */
   z-index: 5;
 }
 
