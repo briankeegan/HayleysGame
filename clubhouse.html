@@ -27,6 +27,7 @@
     .club-header { position: relative; }
     .club-header h1 { margin: 0; font-size: 1.15rem; }
     .club-header .sub { font-size: 0.72rem; opacity: 0.75; margin-top: 2px; }
+    .club-header .version { font-size: 0.62rem; opacity: 0.45; margin-top: 3px; }
     .game-btn {
       position: absolute;
       left: 12px;
@@ -251,6 +252,7 @@
     <button class="logout-btn" id="logoutBtn" hidden>Leave</button>
     <h1>🏰 The Clubhouse</h1>
     <div class="sub">a secret place to talk about Hayley's Game</div>
+    <div class="version" id="versionStamp"></div>
   </header>
 
   <div class="gate" id="gate">
@@ -293,7 +295,13 @@
     </div>
   </div>
 
+  <script src="version.js"></script>
   <script>
+    // window.APP_VERSION comes from version.js, stamped fresh by the deploy
+    // workflow on every run (404s harmlessly in local dev, where the file
+    // doesn't exist).
+    document.getElementById("versionStamp").textContent = window.APP_VERSION || "";
+
     // Wired to the standing "Clubhouse" PR whose comments are the thread.
     var REPO = "briankeegan/HayleysGame";
     var PR_NUMBER = 33;
