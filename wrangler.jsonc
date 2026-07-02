@@ -1,0 +1,8 @@
+// Cloudflare Workers config: deploys the clubhouse relay when this repo is
+// connected as a Cloudflare Workers project (deploy command: npx wrangler deploy).
+// The game itself is NOT served by Cloudflare — it lives on GitHub Pages.
+{
+  "name": "hayleys-clubhouse",
+  "main": "clubhouse/worker.js",
+  "compatibility_date": "2025-01-01"
+}
