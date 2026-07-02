@@ -431,24 +431,42 @@ gridEl.addEventListener("pointermove", (e) => {
 
   for (const c of candidates) {
     const idxInChain = chain.findIndex((t) => t.row === c.row && t.col === c.col);
-    if (idxInChain !== -1) {
+
+    if (idxInChain !== -1 && idxInChain < chain.length - 1) {
       // Retreating onto any earlier tile in the chain backtracks to that point,
       // not just the immediately-previous one — a fast or imprecise drag can
       // skip back past several already-chained tiles in a single move event.
       chain.length = idxInChain + 1;
       break;
     }
+    if (idxInChain === chain.length - 1) {
+      // Already resting on the current end of the chain — nothing to do.
+      break;
+    }
 
     const last = chain[chain.length - 1];
-    const rowDist = Math.abs(c.row - last.row);
-    const colDist = Math.abs(c.col - last.col);
-    if (rowDist > 1 || colDist > 1) continue;
-
     const tile = grid[c.row][c.col];
-    if (!tile || tile.value !== chainSum(chain)) continue;
 
-    chain.push({ row: c.row, col: c.col, value: tile.value });
-    break;
+    const lastRowDist = Math.abs(c.row - last.row);
+    const lastColDist = Math.abs(c.col - last.col);
+    if (lastRowDist <= 1 && lastColDist <= 1 && tile && tile.value === chainSum(chain)) {
+      chain.push({ row: c.row, col: c.col, value: tile.value });
+      break;
+    }
+
+    // Not a forward extension — but if it's a different, equally valid neighbor
+    // of the tile BEFORE the current end, swap it in as the new end instead of
+    // requiring the player to retrace back through the tile being replaced first.
+    if (chain.length >= 2) {
+      const anchor = chain[chain.length - 2];
+      const anchorRowDist = Math.abs(c.row - anchor.row);
+      const anchorColDist = Math.abs(c.col - anchor.col);
+      const requiredValue = chainSum(chain.slice(0, -1));
+      if (anchorRowDist <= 1 && anchorColDist <= 1 && tile && tile.value === requiredValue) {
+        chain[chain.length - 1] = { row: c.row, col: c.col, value: tile.value };
+        break;
+      }
+    }
   }
 
   if (candidates.length) {
