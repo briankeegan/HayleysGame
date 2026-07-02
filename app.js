@@ -59,7 +59,22 @@ function randomValue() {
 }
 
 function chainSum(ch) {
-  return ch.reduce((sum, t) => sum + t.value, 0);
+  // Simulates dropping the chain's tiles one at a time into a single stack and
+  // letting equal-adjacent pairs auto-merge (cascading, like a physical 2048
+  // stack) — this is the only model that matches both the documented 2-2-4-8
+  // -> 16 example and confirmed same-value runs (2-2-2 -> 4, 2-2-2-2 -> 8).
+  const stack = [];
+  let highest = 0;
+  for (const tile of ch) {
+    let v = tile.value;
+    while (stack.length && stack[stack.length - 1] === v) {
+      stack.pop();
+      v *= 2;
+      highest = Math.max(highest, v);
+    }
+    stack.push(v);
+  }
+  return highest;
 }
 
 // A tile can extend a chain onto a preceding tile of value `prevValue` only if
@@ -256,7 +271,7 @@ function tileStyleFor(el, row, col, value) {
   el.textContent = String(value);
 }
 
-function renderTiles() {
+function renderTiles(animateNew, skipDropInId) {
   const seen = new Set();
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
@@ -264,19 +279,34 @@ function renderTiles() {
       if (!t) continue;
       seen.add(t.id);
       let el = tileEls.get(t.id);
-      if (!el) {
+      const isNew = !el;
+      if (isNew) {
         el = document.createElement("div");
         el.className = "tile";
         tilesEl.appendChild(el);
         tileEls.set(t.id, el);
       }
       tileStyleFor(el, r, c, t.value);
+
+      if (isNew && animateNew && t.id !== skipDropInId) {
+        const finalTop = el.style.top;
+        el.classList.add("dropping-in");
+        el.style.top = `${-cellSize}px`;
+        el.style.opacity = "0";
+        void el.offsetWidth;
+        requestAnimationFrame(() => {
+          el.style.top = finalTop;
+          el.style.opacity = "1";
+        });
+        setTimeout(() => el.classList.remove("dropping-in"), 340);
+      }
     }
   }
   for (const [id, el] of tileEls) {
     if (!seen.has(id)) {
-      el.remove();
       tileEls.delete(id);
+      el.classList.add("removing");
+      setTimeout(() => el.remove(), 160);
     }
   }
 }
@@ -429,7 +459,7 @@ function performMerge() {
 
   updateMinSpawnTier();
   applyGravity();
-  renderTiles();
+  renderTiles(true, mergedId);
   markPop(mergedId);
 
   checkMilestone(finalValue);
