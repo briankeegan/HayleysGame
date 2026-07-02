@@ -43,8 +43,19 @@ let gameOver = false;
 let nextMilestoneIndex = 0;
 let minSpawnTier = 2;
 
+// New tiles spawn as one of 4 consecutive power-of-two tiers starting at the
+// current floor (e.g. 2/4/8/16), weighted toward the lower end. Once every tile
+// of the floor value clears off the board, the whole window slides up a tier
+// (floor doubles, so the window becomes 4/8/16/32, etc).
+const SPAWN_WEIGHTS = [0.5, 0.3, 0.15, 0.05];
+
 function randomValue() {
-  return Math.random() < 0.9 ? minSpawnTier : minSpawnTier * 2;
+  let roll = Math.random();
+  for (let i = 0; i < SPAWN_WEIGHTS.length; i++) {
+    roll -= SPAWN_WEIGHTS[i];
+    if (roll < 0) return minSpawnTier * 2 ** i;
+  }
+  return minSpawnTier * 2 ** (SPAWN_WEIGHTS.length - 1);
 }
 
 function chainSum(ch) {
