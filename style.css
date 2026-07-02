@@ -15,6 +15,9 @@ html, body {
 body {
   display: flex;
   flex-direction: column;
+  /* Stable small-viewport height: the board doesn't jump when the mobile
+     browser's address bar collapses or expands. */
+  height: 100svh;
 }
 
 .app-header {
@@ -70,6 +73,9 @@ body {
   align-items: center;
   justify-content: center;
   background: #faf8ef;
+  /* Set while the install banner is visible so the board centers in the
+     space above it instead of sitting underneath. */
+  margin-bottom: var(--banner-space, 0px);
 }
 
 .grid {

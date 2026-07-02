@@ -21,9 +21,25 @@
     dismissed = localStorage.getItem('installBannerDismissed') === '1';
   } catch (e) {}
 
+  // Reserve the banner's on-screen footprint via --banner-space so the board
+  // re-centers in the space above it, and let the game re-run its layout.
+  function showBanner() {
+    banner.classList.add('visible');
+    var rect = banner.getBoundingClientRect();
+    var space = Math.max(0, window.innerHeight - rect.top) + 8;
+    document.documentElement.style.setProperty('--banner-space', space + 'px');
+    window.dispatchEvent(new Event('resize'));
+  }
+
+  function hideBanner() {
+    banner.classList.remove('visible');
+    document.documentElement.style.setProperty('--banner-space', '0px');
+    window.dispatchEvent(new Event('resize'));
+  }
+
   // iPhone can't trigger the install dialog from a page, so show instructions.
   if (isIphone && !isInstalled && !dismissed) {
-    banner.classList.add('visible');
+    showBanner();
   }
 
   // Android fires beforeinstallprompt, letting an Install button open the
@@ -35,7 +51,7 @@
     deferredPrompt = event;
     bannerText.textContent = 'Play offline, right from your home screen';
     installBtn.hidden = false;
-    banner.classList.add('visible');
+    showBanner();
   });
 
   installBtn.addEventListener('click', function () {
@@ -43,16 +59,14 @@
     deferredPrompt.prompt();
     deferredPrompt.userChoice.then(function () {
       deferredPrompt = null;
-      banner.classList.remove('visible');
+      hideBanner();
     });
   });
 
-  window.addEventListener('appinstalled', function () {
-    banner.classList.remove('visible');
-  });
+  window.addEventListener('appinstalled', hideBanner);
 
   closeBtn.addEventListener('click', function () {
-    banner.classList.remove('visible');
+    hideBanner();
     try {
       localStorage.setItem('installBannerDismissed', '1');
     } catch (e) {}
