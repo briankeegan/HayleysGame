@@ -77,12 +77,14 @@ function closestPowerOfTwo(sum) {
   return upper - sum < sum - lower ? upper : lower;
 }
 
-// A tile can extend the chain only if everything gathered so far already
-// sums to at least its value — e.g. a lone 2 can't reach a 128 next to it,
-// but a 128 can always absorb an adjacent 2 (its running sum already exceeds
-// it), and a chain that's built up to 8 can reach an adjacent 8.
+// A tile can extend the chain only if BOTH hold: it's at least as big as the
+// tile it's following (the chain can never step down — 2-2-2-4 is valid,
+// 2-2-2-4-2 is not, since once it's risen to 4 only 4-or-bigger can follow),
+// AND everything gathered so far already sums to at least its value (so a
+// lone 2 can't reach a 4 directly — it takes two 2s summing to 4 first).
 function canFollow(chainSoFar, nextValue) {
-  return chainSum(chainSoFar) >= nextValue;
+  const last = chainSoFar[chainSoFar.length - 1].value;
+  return nextValue >= last && chainSum(chainSoFar) >= nextValue;
 }
 
 function valueColor(v) {
@@ -120,6 +122,11 @@ function updateMinSpawnTier() {
   }
 }
 
+// Every chain has to start with two equal adjacent tiles — canFollow's sum
+// condition means a lone tile can only ever reach a same-valued neighbor
+// (chainSum([t]) === t.value, so nextValue can be no bigger than t.value,
+// and the non-decreasing condition means it can be no smaller either). So a
+// move exists somewhere on the board iff some adjacent pair is equal.
 function hasAnyMove() {
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
@@ -130,7 +137,7 @@ function hasAnyMove() {
         const nc = c + dc;
         if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) continue;
         const n = grid[nr][nc];
-        if (n && t.value >= n.value) return true;
+        if (n && n.value === t.value) return true;
       }
     }
   }
