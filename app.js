@@ -496,17 +496,35 @@ function performMerge() {
   hideHoverRing();
   boardAnimating = true;
 
-  // Animate the running total climbing as each other tile in the chain flies
-  // into the release point, one at a time in order, finishing with a snap to
-  // the nearest power of two.
-  const others = chainOrder.slice(0, -1);
+  // Replay a natural cascading pairwise merge, in the order the tiles were
+  // touched: each tile merges with the running value it's carrying if the
+  // next tile matches, with the merge happening at the position of whichever
+  // tile is currently being processed (2+2 becomes 4 at the SECOND tile's
+  // spot, then that 4 + the next 4 becomes 8 at the THIRD tile's spot) —
+  // not everything piling onto the release point at once.
+  const stack = [];
   const steps = [];
-  let running = last.value;
-  for (const t of others) {
-    running += t.value;
-    steps.push({ fromEl: tileEls.get(t.id), ontoEl: lastEl, displayValue: running });
+  for (const t of chainOrder) {
+    let cur = { value: t.value, el: tileEls.get(t.id) };
+    while (stack.length && stack[stack.length - 1].value === cur.value) {
+      const prev = stack.pop();
+      steps.push({ fromEl: prev.el, ontoEl: cur.el, displayValue: cur.value * 2 });
+      cur = { value: cur.value * 2, el: cur.el };
+    }
+    stack.push(cur);
   }
-  if (!steps.length || steps[steps.length - 1].displayValue !== finalValue) {
+
+  // The stack doesn't always collapse to a single entry (e.g. an odd-length
+  // same-value run leaves a leftover), and the natural cascade total doesn't
+  // always equal the rounded sum — anything left over visually collapses
+  // into the release point, which always ends up showing the true final value.
+  for (const entry of stack) {
+    if (entry.el !== lastEl) {
+      steps.push({ fromEl: entry.el, ontoEl: lastEl, displayValue: finalValue });
+    }
+  }
+  const finalStep = steps[steps.length - 1];
+  if (!finalStep || finalStep.ontoEl !== lastEl || finalStep.displayValue !== finalValue) {
     steps.push({ fromEl: null, ontoEl: lastEl, displayValue: finalValue });
   }
 
