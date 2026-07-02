@@ -72,17 +72,42 @@ function randomValue() {
 // Called with each merge result. If it reached the milestone, retire the
 // smallest tier: every tile of that value vanishes from the board (gravity
 // then refills from the new, shifted window). Loops in case a single merge
-// blows past more than one milestone.
+// blows past more than one milestone. Returns the retired tiles in reading
+// order so the caller can animate them popping before the refill.
 function applyTierShifts(value) {
+  const retired = [];
   while (value >= nextShiftMilestone()) {
     const retiring = spawnFloor();
     tierShifts++;
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
-        if (grid[r][c] && grid[r][c].value === retiring) grid[r][c] = null;
+        if (grid[r][c] && grid[r][c].value === retiring) {
+          retired.push({ id: grid[r][c].id });
+          grid[r][c] = null;
+        }
       }
     }
   }
+  return retired;
+}
+
+const RETIRE_POP_MS = 260;
+
+// Retired tiles explode one at a time — each swells and bursts — and only
+// after the last one is gone does the board refill. Paced like merges:
+// the whole volley fits the same constant window regardless of tile count.
+function animateRetirement(retired, done) {
+  const stagger = roundDurationFor(retired.length);
+  retired.forEach((t, i) => {
+    setTimeout(() => {
+      const el = tileEls.get(t.id);
+      if (!el) return;
+      tileEls.delete(t.id);
+      el.classList.add("exploding");
+      setTimeout(() => el.remove(), RETIRE_POP_MS + 40);
+    }, Math.round(i * stagger));
+  });
+  setTimeout(done, Math.round(retired.length * stagger) + RETIRE_POP_MS);
 }
 
 function chainSum(ch) {
@@ -739,22 +764,31 @@ function performMerge() {
     score += finalValue;
     updateScoreDisplay();
 
-    applyTierShifts(finalValue);
-    applyGravity();
-    renderTiles(true, last.id);
+    const retired = applyTierShifts(finalValue);
 
-    checkMilestone(finalValue);
-    boardAnimating = false;
-    if (layoutPending) {
-      layoutPending = false;
-      layout();
+    function settleBoard() {
+      applyGravity();
+      renderTiles(true, last.id);
+
+      checkMilestone(finalValue);
+      boardAnimating = false;
+      if (layoutPending) {
+        layoutPending = false;
+        layout();
+      }
+
+      if (!hasAnyMove()) {
+        triggerLose();
+        return;
+      }
+      saveProgress();
     }
 
-    if (!hasAnyMove()) {
-      triggerLose();
-      return;
+    if (retired.length) {
+      animateRetirement(retired, settleBoard);
+    } else {
+      settleBoard();
     }
-    saveProgress();
   }
 
   let roundIndex = 0;
