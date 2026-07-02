@@ -3,6 +3,7 @@ const ROWS = 13;
 const GAP = 4;
 const WIN_VALUE = 2048;
 const BEST_SCORE_KEY = "hayleysgame_best";
+const STATE_KEY = "hayleysgame_state";
 const DIRS = [
   [-1, -1], [-1, 0], [-1, 1],
   [0, -1], [0, 1],
@@ -100,6 +101,7 @@ function initGrid() {
 }
 
 function resetGame() {
+  clearProgress();
   gameOver = false;
   score = 0;
   chain = [];
@@ -108,6 +110,22 @@ function resetGame() {
   tilesEl.innerHTML = "";
   tileEls.clear();
   initGrid();
+  updateScoreDisplay();
+  layout();
+  saveProgress();
+}
+
+function resumeGame(state) {
+  gameOver = false;
+  score = state.score || 0;
+  chain = [];
+  dragging = false;
+  overlayEl.classList.remove("visible");
+  tilesEl.innerHTML = "";
+  tileEls.clear();
+  grid = state.grid.map((row) =>
+    row.map((v) => (v === null ? null : { id: nextId++, value: v }))
+  );
   updateScoreDisplay();
   layout();
 }
@@ -119,6 +137,45 @@ function updateScoreDisplay() {
     localStorage.setItem(BEST_SCORE_KEY, String(best));
   }
   bestEl.textContent = String(best);
+}
+
+function saveProgress() {
+  try {
+    const state = {
+      score,
+      grid: grid.map((row) => row.map((cell) => (cell ? cell.value : null))),
+    };
+    localStorage.setItem(STATE_KEY, JSON.stringify(state));
+  } catch (err) {
+    // localStorage can throw in private browsing / when full — progress just won't persist.
+  }
+}
+
+function clearProgress() {
+  try {
+    localStorage.removeItem(STATE_KEY);
+  } catch (err) {
+    // ignore
+  }
+}
+
+function loadProgress() {
+  try {
+    const raw = localStorage.getItem(STATE_KEY);
+    if (!raw) return null;
+    const state = JSON.parse(raw);
+    if (
+      !state ||
+      !Array.isArray(state.grid) ||
+      state.grid.length !== ROWS ||
+      state.grid.some((row) => !Array.isArray(row) || row.length !== COLS)
+    ) {
+      return null;
+    }
+    return state;
+  } catch (err) {
+    return null;
+  }
 }
 
 function layout() {
@@ -294,6 +351,7 @@ function triggerWin() {
   overlayTitleEl.textContent = "You Win!";
   overlayTextEl.textContent = `You reached ${WIN_VALUE}! Final score: ${score}.`;
   overlayEl.classList.add("visible");
+  clearProgress();
 }
 
 function triggerLose() {
@@ -301,6 +359,7 @@ function triggerLose() {
   overlayTitleEl.textContent = "Game Over";
   overlayTextEl.textContent = `No more merges available. Final score: ${score}.`;
   overlayEl.classList.add("visible");
+  clearProgress();
 }
 
 function performMerge() {
@@ -327,7 +386,9 @@ function performMerge() {
   }
   if (!hasAnyMove()) {
     triggerLose();
+    return;
   }
+  saveProgress();
 }
 
 function endDrag(e) {
@@ -408,4 +469,9 @@ playAgainBtn.addEventListener("click", resetGame);
 
 window.addEventListener("resize", layout);
 
-resetGame();
+const savedState = loadProgress();
+if (savedState) {
+  resumeGame(savedState);
+} else {
+  resetGame();
+}
