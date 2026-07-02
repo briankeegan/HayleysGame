@@ -194,9 +194,8 @@
     // Wired to the standing "Clubhouse" PR whose comments are the thread.
     var REPO = "briankeegan/HayleysGame";
     var PR_NUMBER = 33;
-    // The relay that checks the secret word and posts messages. Set after the
-    // Cloudflare Worker is deployed; until then the page politely refuses.
-    var WORKER_URL = "";
+    // The relay that checks the secret word and posts messages.
+    var WORKER_URL = "https://hayleys-clubhouse.bramp-games.workers.dev";
 
     var gateEl = document.getElementById("gate");
     var gateErrorEl = document.getElementById("gateError");
