@@ -147,6 +147,7 @@ body {
 .tile.removing {
   opacity: 0;
   transform: scale(0.4);
+  z-index: -1;
 }
 
 .tile.dropping-in {
