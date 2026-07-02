@@ -1,6 +1,7 @@
-const COLS = 8;
-const ROWS = 13;
+const COLS = 5;
+const ROWS = 8;
 const GAP = 4;
+const INITIAL_TILE_COUNT = 10;
 const WIN_VALUE = 2248;
 const BEST_SCORE_KEY = "hayleysgame_best";
 const STATE_KEY = "hayleysgame_state";
@@ -100,9 +101,18 @@ function hasAnyMove() {
 function initGrid() {
   let attempts = 0;
   do {
-    grid = Array.from({ length: ROWS }, () =>
-      Array.from({ length: COLS }, () => ({ id: nextId++, value: randomValue() }))
-    );
+    grid = Array.from({ length: ROWS }, () => new Array(COLS).fill(null));
+    const positions = [];
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) positions.push({ r, c });
+    }
+    for (let i = positions.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [positions[i], positions[j]] = [positions[j], positions[i]];
+    }
+    for (const { r, c } of positions.slice(0, INITIAL_TILE_COUNT)) {
+      grid[r][c] = { id: nextId++, value: randomValue() };
+    }
     attempts++;
   } while (!hasAnyMove() && attempts < 20);
 }
@@ -346,11 +356,20 @@ function applyGravity() {
     for (let i = stack.length - 1; i >= 0; i--) {
       newCol[writeRow--] = stack[i];
     }
-    for (let r = writeRow; r >= 0; r--) {
-      newCol[r] = { id: nextId++, value: randomValue() };
-    }
     for (let r = 0; r < ROWS; r++) grid[r][c] = newCol[r];
   }
+}
+
+function spawnOneTile() {
+  const empties = [];
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (!grid[r][c]) empties.push({ r, c });
+    }
+  }
+  if (!empties.length) return;
+  const { r, c } = empties[Math.floor(Math.random() * empties.length)];
+  grid[r][c] = { id: nextId++, value: randomValue() };
 }
 
 function triggerWin() {
@@ -384,6 +403,7 @@ function performMerge() {
   updateChainVisuals();
 
   applyGravity();
+  spawnOneTile();
   renderTiles();
   markPop(mergedId);
 
