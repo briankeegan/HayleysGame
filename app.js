@@ -18,6 +18,7 @@ const chainLineEl = document.getElementById("chainLine");
 const hoverRingEl = document.getElementById("hoverRing");
 const scoreEl = document.getElementById("score");
 const bestEl = document.getElementById("best");
+const chainReadoutEl = document.getElementById("chainReadout");
 const restartBtn = document.getElementById("restartBtn");
 const overlayEl = document.getElementById("overlay");
 const overlayTitleEl = document.getElementById("overlayTitle");
@@ -87,10 +88,16 @@ function canFollow(chainSoFar, nextValue) {
   return nextValue >= last && chainSum(chainSoFar) >= nextValue;
 }
 
+// Shared with the in-progress chain's ring/bridge colors below, so both use
+// the same log-scaled hue math — just fed a raw tile value here, and the
+// chain's running sum there.
+function hueForValue(v) {
+  return (Math.log2(Math.max(1, v)) * 61) % 360;
+}
+
 function valueColor(v) {
   if (PALETTE[v]) return PALETTE[v];
-  const hue = (Math.log2(v) * 61) % 360;
-  return `hsl(${hue}, 70%, 55%)`;
+  return `hsl(${hueForValue(v)}, 70%, 55%)`;
 }
 
 function textColorFor(bg) {
@@ -400,6 +407,13 @@ function cellCandidates(x, y) {
   return candidates;
 }
 
+// Draws the in-progress chain as a ring hugging each selected tile's edge
+// (never crossing over its number) plus short bridges across the gaps to
+// the next tile, so the whole thing reads as one connected trail. Every
+// ring/bridge is colored by hueForValue() fed the RUNNING SUM at that point
+// in the chain (not the tile's own value), so the color visibly shifts as
+// the total climbs — the same log-scaled math the game already uses for
+// tile colors, just driven by the number that actually decides connectivity.
 function updateChainVisuals(pointer) {
   for (const el of tileEls.values()) el.classList.remove("selected");
   for (const t of chain) {
@@ -412,22 +426,60 @@ function updateChainVisuals(pointer) {
 
   if (chain.length === 0) {
     chainLineEl.innerHTML = "";
+    if (chainReadoutEl) chainReadoutEl.textContent = "–";
     return;
   }
 
-  const points = chain.map(
-    (t) => `${t.col * cellSize + cellSize / 2},${t.row * cellSize + cellSize / 2}`
-  );
+  const ringInset = cellSize * 0.06;
+  const ringWidth = Math.max(3, cellSize * 0.055);
+  const ringRadius = cellSize * 0.14;
+  const halfSize = (cellSize - GAP) / 2 - ringInset;
+
+  let running = 0;
+  const cumSums = chain.map((t) => (running += t.value));
+  const centerOf = (t) => ({
+    x: t.col * cellSize + cellSize / 2,
+    y: t.row * cellSize + cellSize / 2,
+  });
+
+  let svg = `<defs><filter id="chainGlow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="${cellSize * 0.035}" /></filter></defs>`;
+
+  for (let i = 0; i < chain.length - 1; i++) {
+    const a = centerOf(chain[i]);
+    const b = centerOf(chain[i + 1]);
+    const color = `hsl(${hueForValue((cumSums[i] + cumSums[i + 1]) / 2)}, 75%, 60%)`;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const dist = Math.hypot(dx, dy) || 1;
+    const ax = a.x + (dx / dist) * halfSize;
+    const ay = a.y + (dy / dist) * halfSize;
+    const bx = b.x - (dx / dist) * halfSize;
+    const by = b.y - (dy / dist) * halfSize;
+    svg += `<line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="${color}" stroke-width="${ringWidth}" stroke-linecap="round" filter="url(#chainGlow)" />`;
+  }
+
+  chain.forEach((t, i) => {
+    const rectX = t.col * cellSize + GAP / 2 + ringInset;
+    const rectY = t.row * cellSize + GAP / 2 + ringInset;
+    const rectSize = cellSize - GAP - ringInset * 2;
+    const color = `hsl(${hueForValue(cumSums[i])}, 75%, 60%)`;
+    svg += `<rect x="${rectX}" y="${rectY}" width="${rectSize}" height="${rectSize}" rx="${ringRadius}" fill="none" stroke="${color}" stroke-width="${ringWidth}" filter="url(#chainGlow)" />`;
+  });
+
   if (pointer) {
     const rect = gridEl.getBoundingClientRect();
-    points.push(`${pointer.clientX - rect.left},${pointer.clientY - rect.top}`);
+    const px = pointer.clientX - rect.left;
+    const py = pointer.clientY - rect.top;
+    const last = centerOf(chain[chain.length - 1]);
+    const color = `hsl(${hueForValue(cumSums[cumSums.length - 1])}, 75%, 60%)`;
+    svg += `<line x1="${last.x}" y1="${last.y}" x2="${px}" y2="${py}" stroke="${color}" stroke-width="${ringWidth * 0.7}" stroke-linecap="round" opacity="0.55" />`;
+    svg += `<circle cx="${px}" cy="${py}" r="${ringWidth * 0.8}" fill="${color}" opacity="0.85" />`;
   }
-  chainLineEl.innerHTML = `<polyline points="${points.join(
-    " "
-  )}" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="${Math.max(
-    4,
-    cellSize * 0.12
-  )}" stroke-linecap="round" stroke-linejoin="round" />`;
+
+  chainLineEl.innerHTML = svg;
+
+  const sum = cumSums[cumSums.length - 1];
+  if (chainReadoutEl) chainReadoutEl.textContent = `Σ${sum} ▸ ${closestPowerOfTwo(sum)}`;
 }
 
 function showHoverRing(row, col, status) {
