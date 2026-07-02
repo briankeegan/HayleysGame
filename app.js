@@ -380,7 +380,10 @@ function checkMilestone(value) {
 function triggerLose() {
   gameOver = true;
   overlayTitleEl.textContent = "Game Over";
-  overlayTextEl.textContent = `No more merges available. Final score: ${score}.`;
+  overlayTextEl.textContent =
+    score >= best && score > 0
+      ? `No more merges available. New high score: ${score}!`
+      : `No more merges available. Final score: ${score}. Best: ${best}.`;
   overlayEl.classList.add("visible");
   clearProgress();
 }
