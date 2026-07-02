@@ -266,6 +266,18 @@ body {
   font-weight: 700;
 }
 
+.install-banner-btn {
+  flex: 0 0 auto;
+  background: #f2b179;
+  border: none;
+  color: #3a2a1a;
+  font-weight: 700;
+  font-size: 0.85rem;
+  padding: 9px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
 .install-banner-close {
   flex: 0 0 auto;
   background: rgba(255, 255, 255, 0.12);
