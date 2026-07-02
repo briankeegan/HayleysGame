@@ -1,7 +1,7 @@
 const COLS = 8;
 const ROWS = 13;
 const GAP = 4;
-const WIN_VALUE = 2048;
+const WIN_VALUE = 2248;
 const BEST_SCORE_KEY = "hayleysgame_best";
 const STATE_KEY = "hayleysgame_state";
 const DIRS = [
@@ -45,7 +45,14 @@ function randomValue() {
 }
 
 function chainSum(ch) {
-  return ch.length ? ch[0].value * Math.pow(2, ch.length - 1) : 0;
+  return ch.reduce((sum, t) => sum + t.value, 0);
+}
+
+// A tile can extend a chain onto a preceding tile of value `prevValue` only if
+// it repeats that same value (2-2-2-2...) or is exactly double it (2-2-4-8...);
+// runs of more than 2 equal tiles are allowed before the value has to "level up".
+function canFollow(prevValue, nextValue) {
+  return nextValue === prevValue || nextValue === prevValue * 2;
 }
 
 function valueColor(v) {
@@ -449,7 +456,7 @@ gridEl.addEventListener("pointermove", (e) => {
 
     const lastRowDist = Math.abs(c.row - last.row);
     const lastColDist = Math.abs(c.col - last.col);
-    if (lastRowDist <= 1 && lastColDist <= 1 && tile && tile.value === chainSum(chain)) {
+    if (lastRowDist <= 1 && lastColDist <= 1 && tile && canFollow(last.value, tile.value)) {
       chain.push({ row: c.row, col: c.col, value: tile.value });
       break;
     }
@@ -461,8 +468,7 @@ gridEl.addEventListener("pointermove", (e) => {
       const anchor = chain[chain.length - 2];
       const anchorRowDist = Math.abs(c.row - anchor.row);
       const anchorColDist = Math.abs(c.col - anchor.col);
-      const requiredValue = chainSum(chain.slice(0, -1));
-      if (anchorRowDist <= 1 && anchorColDist <= 1 && tile && tile.value === requiredValue) {
+      if (anchorRowDist <= 1 && anchorColDist <= 1 && tile && canFollow(anchor.value, tile.value)) {
         chain[chain.length - 1] = { row: c.row, col: c.col, value: tile.value };
         break;
       }
