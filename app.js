@@ -44,10 +44,13 @@ let nextMilestoneIndex = 0;
 let minSpawnTier = 2;
 
 // New tiles spawn as one of 4 consecutive power-of-two tiers starting at the
-// current floor (e.g. 2/4/8/16), weighted toward the lower end. Once every tile
-// of the floor value clears off the board, the whole window slides up a tier
-// (floor doubles, so the window becomes 4/8/16/32, etc).
-const SPAWN_WEIGHTS = [0.5, 0.3, 0.15, 0.05];
+// current floor (e.g. 2/4/8/16). Each tier is exactly twice as likely as the
+// next (2 is 2x as likely as 4, 4 is 2x as likely as 8, ...): a geometric
+// weighting of 8/15, 4/15, 2/15, 1/15. Once every tile of the floor value
+// clears off the board, the whole window slides up a tier (floor doubles, so
+// the window becomes 4/8/16/32, etc). Used for both the initial board fill
+// and ongoing gravity refills, since both go through randomValue().
+const SPAWN_WEIGHTS = [8 / 15, 4 / 15, 2 / 15, 1 / 15];
 
 function randomValue() {
   let roll = Math.random();
