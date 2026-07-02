@@ -41,6 +41,7 @@ let chain = [];
 let dragging = false;
 let gameOver = false;
 let boardAnimating = false;
+let layoutPending = false;
 let nextMilestoneIndex = 0;
 let minSpawnTier = 2;
 
@@ -232,6 +233,14 @@ function loadProgress() {
 }
 
 function layout() {
+  // A resize mid-merge-animation (e.g. a mobile browser's address bar hiding
+  // or showing while the player is dragging) would otherwise re-render every
+  // tile — including ones mid-flight in the cascade animation — stomping on
+  // their in-progress inline styles and animation classes. Defer instead.
+  if (boardAnimating) {
+    layoutPending = true;
+    return;
+  }
   const rect = boardEl.getBoundingClientRect();
   const maxWidth = rect.width - 16;
   const maxHeight = rect.height - 16;
@@ -285,12 +294,25 @@ function renderTiles(animateNew, skipDropInId) {
         el.className = "tile";
         tilesEl.appendChild(el);
         tileEls.set(t.id, el);
+      } else {
+        // A tile that's still legitimately on the board should never carry a
+        // leftover animation class from a prior cycle (e.g. a stray "removing"
+        // from a race with an interrupted merge) — always start clean.
+        el.classList.remove("removing", "dropping-in");
       }
+
+      // Every tile settling into place after a merge — brand new spawns AND
+      // existing tiles just falling to a new row via gravity — shares the same
+      // slower, bouncy transition, so the whole board settles at one
+      // consistent speed instead of new tiles gliding in slowly while shifted
+      // tiles snap instantly.
+      const useSettleTransition = animateNew && t.id !== skipDropInId;
+      if (useSettleTransition) el.classList.add("dropping-in");
+
       tileStyleFor(el, r, c, t.value);
 
-      if (isNew && animateNew && t.id !== skipDropInId) {
+      if (isNew && useSettleTransition) {
         const finalTop = el.style.top;
-        el.classList.add("dropping-in");
         el.style.top = `${-cellSize}px`;
         el.style.opacity = "0";
         void el.offsetWidth;
@@ -298,7 +320,9 @@ function renderTiles(animateNew, skipDropInId) {
           el.style.top = finalTop;
           el.style.opacity = "1";
         });
-        setTimeout(() => el.classList.remove("dropping-in"), 340);
+      }
+      if (useSettleTransition) {
+        setTimeout(() => el.classList.remove("dropping-in"), 550);
       }
     }
   }
@@ -503,6 +527,10 @@ function performMerge() {
 
     checkMilestone(finalValue);
     boardAnimating = false;
+    if (layoutPending) {
+      layoutPending = false;
+      layout();
+    }
 
     if (!hasAnyMove()) {
       triggerLose();
