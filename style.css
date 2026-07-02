@@ -93,6 +93,28 @@ body {
   overflow: visible;
 }
 
+.hover-ring {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  border-radius: 8px;
+  border: 3px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.25), 0 0 10px 2px rgba(255, 255, 255, 0.6);
+  display: none;
+  transition: left 0.06s linear, top 0.06s linear, border-color 0.08s ease;
+  z-index: 10;
+}
+
+.hover-ring.valid {
+  border-color: #ffffff;
+}
+
+.hover-ring.invalid {
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow: none;
+}
+
 .cell {
   position: absolute;
   background: rgba(238, 228, 218, 0.35);

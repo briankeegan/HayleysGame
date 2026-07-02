@@ -14,6 +14,7 @@ const gridEl = document.getElementById("grid");
 const cellsEl = document.getElementById("cells");
 const tilesEl = document.getElementById("tiles");
 const chainLineEl = document.getElementById("chainLine");
+const hoverRingEl = document.getElementById("hoverRing");
 const scoreEl = document.getElementById("score");
 const bestEl = document.getElementById("best");
 const restartBtn = document.getElementById("restartBtn");
@@ -257,6 +258,19 @@ function updateChainVisuals(pointer) {
   )}" stroke-linecap="round" stroke-linejoin="round" />`;
 }
 
+function showHoverRing(row, col, status) {
+  hoverRingEl.style.display = "block";
+  hoverRingEl.style.left = `${col * cellSize + GAP / 2}px`;
+  hoverRingEl.style.top = `${row * cellSize + GAP / 2}px`;
+  hoverRingEl.style.width = `${cellSize - GAP}px`;
+  hoverRingEl.style.height = `${cellSize - GAP}px`;
+  hoverRingEl.className = `hover-ring ${status}`;
+}
+
+function hideHoverRing() {
+  hoverRingEl.style.display = "none";
+}
+
 function applyGravity() {
   for (let c = 0; c < COLS; c++) {
     const stack = [];
@@ -328,6 +342,7 @@ function endDrag(e) {
     chain = [];
     updateChainVisuals();
   }
+  hideHoverRing();
 }
 
 gridEl.addEventListener("pointerdown", (e) => {
@@ -341,6 +356,7 @@ gridEl.addEventListener("pointerdown", (e) => {
   chain = [{ row: cell.row, col: cell.col, value: tile.value }];
   gridEl.setPointerCapture(e.pointerId);
   updateChainVisuals(e);
+  showHoverRing(cell.row, cell.col, "valid");
 });
 
 gridEl.addEventListener("pointermove", (e) => {
@@ -350,29 +366,35 @@ gridEl.addEventListener("pointermove", (e) => {
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
 
-  const last = chain[chain.length - 1];
-  const prev = chain.length >= 2 ? chain[chain.length - 2] : null;
   const candidates = cellCandidates(x, y);
 
   for (const c of candidates) {
-    if (c.row === last.row && c.col === last.col) {
-      break;
-    }
-    if (prev && c.row === prev.row && c.col === prev.col) {
-      chain.pop();
+    const idxInChain = chain.findIndex((t) => t.row === c.row && t.col === c.col);
+    if (idxInChain !== -1) {
+      // Retreating onto any earlier tile in the chain backtracks to that point,
+      // not just the immediately-previous one — a fast or imprecise drag can
+      // skip back past several already-chained tiles in a single move event.
+      chain.length = idxInChain + 1;
       break;
     }
 
+    const last = chain[chain.length - 1];
     const rowDist = Math.abs(c.row - last.row);
     const colDist = Math.abs(c.col - last.col);
     if (rowDist > 1 || colDist > 1) continue;
-    if (chain.some((t) => t.row === c.row && t.col === c.col)) continue;
 
     const tile = grid[c.row][c.col];
     if (!tile || tile.value !== chainSum(chain)) continue;
 
     chain.push({ row: c.row, col: c.col, value: tile.value });
     break;
+  }
+
+  if (candidates.length) {
+    const nearest = candidates[0];
+    const end = chain[chain.length - 1];
+    const onChainEnd = nearest.row === end.row && nearest.col === end.col;
+    showHoverRing(nearest.row, nearest.col, onChainEnd ? "valid" : "invalid");
   }
 
   updateChainVisuals(e);
