@@ -280,6 +280,14 @@ function tileStyleFor(el, row, col, value) {
   el.textContent = String(value);
 }
 
+const FALL_BASE_MS = 220;
+const FALL_PER_ROW_MS = 45;
+const FALL_MAX_MS = 700;
+
+function fallDurationFor(rowsFallen) {
+  return Math.min(FALL_MAX_MS, FALL_BASE_MS + Math.max(0, rowsFallen) * FALL_PER_ROW_MS);
+}
+
 function renderTiles(animateNew, skipDropInId) {
   const seen = new Set();
   for (let r = 0; r < ROWS; r++) {
@@ -303,11 +311,17 @@ function renderTiles(animateNew, skipDropInId) {
 
       // Every tile settling into place after a merge — brand new spawns AND
       // existing tiles just falling to a new row via gravity — shares the same
-      // slower, bouncy transition, so the whole board settles at one
-      // consistent speed instead of new tiles gliding in slowly while shifted
-      // tiles snap instantly.
+      // bouncy transition, timed by how many rows it actually fell in its
+      // column, so a tile dropping the full height of the board lands with
+      // more weight than one that barely moved.
       const useSettleTransition = animateNew && t.id !== skipDropInId;
-      if (useSettleTransition) el.classList.add("dropping-in");
+      let fallMs = FALL_BASE_MS;
+      if (useSettleTransition) {
+        const rowsFallen = isNew ? r + 1 : Math.max(0, r - Math.round(parseFloat(el.style.top) / cellSize));
+        fallMs = fallDurationFor(rowsFallen);
+        el.classList.add("dropping-in");
+        el.style.transition = `top ${fallMs}ms cubic-bezier(0.22, 1.6, 0.36, 1), left 0.12s ease, opacity 0.2s ease`;
+      }
 
       tileStyleFor(el, r, c, t.value);
 
@@ -322,7 +336,10 @@ function renderTiles(animateNew, skipDropInId) {
         });
       }
       if (useSettleTransition) {
-        setTimeout(() => el.classList.remove("dropping-in"), 550);
+        setTimeout(() => {
+          el.classList.remove("dropping-in");
+          el.style.transition = "";
+        }, fallMs + 50);
       }
     }
   }
