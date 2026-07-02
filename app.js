@@ -442,38 +442,61 @@ function updateChainVisuals(pointer) {
     y: t.row * cellSize + cellSize / 2,
   });
 
+  // A dark outline behind every ring/bridge, plus a bright white core inside
+  // the color, so the trail stays legible even when its hue happens to land
+  // close to the tile it's sitting on (e.g. a run of 2s, which are already
+  // blue, mapping to a blue-ish hue at a low running sum).
+  const outlineWidth = ringWidth + cellSize * 0.05;
+  const coreWidth = Math.max(1.5, ringWidth * 0.34);
+
   let svg = `<defs><filter id="chainGlow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="${cellSize * 0.035}" /></filter></defs>`;
 
+  const bridgeEndpoints = [];
   for (let i = 0; i < chain.length - 1; i++) {
     const a = centerOf(chain[i]);
     const b = centerOf(chain[i + 1]);
-    const color = `hsl(${hueForValue((cumSums[i] + cumSums[i + 1]) / 2)}, 75%, 60%)`;
     const dx = b.x - a.x;
     const dy = b.y - a.y;
     const dist = Math.hypot(dx, dy) || 1;
-    const ax = a.x + (dx / dist) * halfSize;
-    const ay = a.y + (dy / dist) * halfSize;
-    const bx = b.x - (dx / dist) * halfSize;
-    const by = b.y - (dy / dist) * halfSize;
-    svg += `<line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="${color}" stroke-width="${ringWidth}" stroke-linecap="round" filter="url(#chainGlow)" />`;
+    bridgeEndpoints.push({
+      ax: a.x + (dx / dist) * halfSize,
+      ay: a.y + (dy / dist) * halfSize,
+      bx: b.x - (dx / dist) * halfSize,
+      by: b.y - (dy / dist) * halfSize,
+      color: `hsl(${hueForValue((cumSums[i] + cumSums[i + 1]) / 2)}, 85%, 62%)`,
+    });
+  }
+  for (const { ax, ay, bx, by } of bridgeEndpoints) {
+    svg += `<line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="rgba(20,20,25,0.55)" stroke-width="${outlineWidth}" stroke-linecap="round" filter="url(#chainGlow)" />`;
+  }
+  for (const { ax, ay, bx, by, color } of bridgeEndpoints) {
+    svg += `<line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="${color}" stroke-width="${ringWidth}" stroke-linecap="round" />`;
+    svg += `<line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="#fff" stroke-width="${coreWidth}" stroke-linecap="round" opacity="0.9" />`;
   }
 
-  chain.forEach((t, i) => {
-    const rectX = t.col * cellSize + GAP / 2 + ringInset;
-    const rectY = t.row * cellSize + GAP / 2 + ringInset;
-    const rectSize = cellSize - GAP - ringInset * 2;
-    const color = `hsl(${hueForValue(cumSums[i])}, 75%, 60%)`;
-    svg += `<rect x="${rectX}" y="${rectY}" width="${rectSize}" height="${rectSize}" rx="${ringRadius}" fill="none" stroke="${color}" stroke-width="${ringWidth}" filter="url(#chainGlow)" />`;
-  });
+  const rings = chain.map((t, i) => ({
+    rectX: t.col * cellSize + GAP / 2 + ringInset,
+    rectY: t.row * cellSize + GAP / 2 + ringInset,
+    rectSize: cellSize - GAP - ringInset * 2,
+    color: `hsl(${hueForValue(cumSums[i])}, 85%, 62%)`,
+  }));
+  for (const { rectX, rectY, rectSize } of rings) {
+    svg += `<rect x="${rectX}" y="${rectY}" width="${rectSize}" height="${rectSize}" rx="${ringRadius}" fill="none" stroke="rgba(20,20,25,0.55)" stroke-width="${outlineWidth}" filter="url(#chainGlow)" />`;
+  }
+  for (const { rectX, rectY, rectSize, color } of rings) {
+    svg += `<rect x="${rectX}" y="${rectY}" width="${rectSize}" height="${rectSize}" rx="${ringRadius}" fill="none" stroke="${color}" stroke-width="${ringWidth}" />`;
+    svg += `<rect x="${rectX}" y="${rectY}" width="${rectSize}" height="${rectSize}" rx="${ringRadius}" fill="none" stroke="#fff" stroke-width="${coreWidth}" opacity="0.9" />`;
+  }
 
   if (pointer) {
     const rect = gridEl.getBoundingClientRect();
     const px = pointer.clientX - rect.left;
     const py = pointer.clientY - rect.top;
     const last = centerOf(chain[chain.length - 1]);
-    const color = `hsl(${hueForValue(cumSums[cumSums.length - 1])}, 75%, 60%)`;
-    svg += `<line x1="${last.x}" y1="${last.y}" x2="${px}" y2="${py}" stroke="${color}" stroke-width="${ringWidth * 0.7}" stroke-linecap="round" opacity="0.55" />`;
-    svg += `<circle cx="${px}" cy="${py}" r="${ringWidth * 0.8}" fill="${color}" opacity="0.85" />`;
+    const color = `hsl(${hueForValue(cumSums[cumSums.length - 1])}, 85%, 62%)`;
+    svg += `<line x1="${last.x}" y1="${last.y}" x2="${px}" y2="${py}" stroke="rgba(20,20,25,0.5)" stroke-width="${ringWidth * 0.7 + 2}" stroke-linecap="round" />`;
+    svg += `<line x1="${last.x}" y1="${last.y}" x2="${px}" y2="${py}" stroke="${color}" stroke-width="${ringWidth * 0.7}" stroke-linecap="round" opacity="0.75" />`;
+    svg += `<circle cx="${px}" cy="${py}" r="${ringWidth * 0.85}" fill="${color}" stroke="rgba(20,20,25,0.55)" stroke-width="2" />`;
   }
 
   chainLineEl.innerHTML = svg;
