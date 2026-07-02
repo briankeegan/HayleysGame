@@ -226,3 +226,55 @@ body {
   opacity: 1;
   transform: translate(-50%, 0);
 }
+
+.install-banner {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  display: none;
+  align-items: center;
+  gap: 12px;
+  background: #2f3b52;
+  color: #fff;
+  padding: 12px 14px;
+  border-radius: 14px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+  z-index: 300;
+}
+
+.install-banner.visible {
+  display: flex;
+}
+
+.install-banner-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 9px;
+  flex: 0 0 auto;
+}
+
+.install-banner-text {
+  flex: 1 1 auto;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.share-glyph {
+  display: inline-block;
+  color: #f2b179;
+  font-weight: 700;
+}
+
+.install-banner-close {
+  flex: 0 0 auto;
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  color: #fff;
+  font-size: 1.1rem;
+  line-height: 1;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  cursor: pointer;
+}
