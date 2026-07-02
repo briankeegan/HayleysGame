@@ -4,5 +4,12 @@
 {
   "name": "sdsgame",
   "main": "clubhouse/worker.js",
-  "compatibility_date": "2025-01-01"
+  "compatibility_date": "2025-01-01",
+  // Plaintext settings live here because dashboard-entered Text variables
+  // are wiped on every deploy. Secrets (GITHUB_TOKEN, SECRET_WORD) are set
+  // in the dashboard and DO survive deploys.
+  "vars": {
+    "REPO": "briankeegan/HayleysGame",
+    "PR_NUMBER": "33"
+  }
 }
