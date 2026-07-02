@@ -63,42 +63,25 @@ function randomValue() {
 }
 
 function chainSum(ch) {
-  // Simulates dropping the chain's tiles one at a time into a single stack and
-  // letting equal-adjacent pairs auto-merge (cascading, like a physical 2048
-  // stack) — this is the only model that matches both the documented 2-2-4-8
-  // -> 16 example and confirmed same-value runs (2-2-2 -> 4, 2-2-2-2 -> 8).
-  const stack = [];
-  let highest = 0;
-  for (const tile of ch) {
-    let v = tile.value;
-    while (stack.length && stack[stack.length - 1] === v) {
-      stack.pop();
-      v *= 2;
-      highest = Math.max(highest, v);
-    }
-    stack.push(v);
-  }
-  return highest;
+  return ch.reduce((sum, t) => sum + t.value, 0);
 }
 
-// The value the chain has cascaded up to so far, as if it ended right here —
-// same cascading pairwise-merge as chainSum(), except a single tile's "value
-// so far" is just its own face value (chainSum returns 0 for a lone tile,
-// since no merge has happened yet).
-function cascadeValueSoFar(chainSoFar) {
-  return chainSoFar.length === 1 ? chainSoFar[0].value : chainSum(chainSoFar);
+// The merged tile's value is the running sum rounded to the nearest power of
+// two (ties round down): 2-2-2 sums to 6, closer to 4 than 8, so it merges
+// into 4; 2-2-2-2 sums to 8 exactly.
+function closestPowerOfTwo(sum) {
+  if (sum <= 0) return 0;
+  const lower = 2 ** Math.floor(Math.log2(sum));
+  const upper = lower * 2;
+  return upper - sum < sum - lower ? upper : lower;
 }
 
-// A tile can extend a chain if it repeats the immediately-preceding tile's
-// raw value (2-2-2-2... indefinitely), OR matches the value the chain has
-// already cascaded up to (2-2-2-2 cascades to 8, so an 8 can follow even
-// though the preceding raw tile was still a 2). The very first connection
-// must be an exact match either way: 2-4 alone is not a valid 2-tile chain
-// (cascade-so-far for a lone 2 is just 2), but 2-2-4 is, since the escalation
-// to 4 only happens after the initial 2-2 pairing produces a cascade value of 4.
+// A tile can extend the chain only if everything gathered so far already
+// sums to at least its value — e.g. a lone 2 can't reach a 128 next to it,
+// but a 128 can always absorb an adjacent 2 (its running sum already exceeds
+// it), and a chain that's built up to 8 can reach an adjacent 8.
 function canFollow(chainSoFar, nextValue) {
-  const last = chainSoFar[chainSoFar.length - 1];
-  return nextValue === last.value || nextValue === cascadeValueSoFar(chainSoFar);
+  return chainSum(chainSoFar) >= nextValue;
 }
 
 function valueColor(v) {
@@ -146,7 +129,7 @@ function hasAnyMove() {
         const nc = c + dc;
         if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) continue;
         const n = grid[nr][nc];
-        if (n && n.value === t.value) return true;
+        if (n && t.value >= n.value) return true;
       }
     }
   }
@@ -462,43 +445,28 @@ function triggerLose() {
 const POP_STAGGER_MS = 220;
 
 function performMerge() {
-  const finalValue = chainSum(chain);
   const chainOrder = chain.map((t) => ({ ...t, id: grid[t.row][t.col].id }));
   const last = chainOrder[chainOrder.length - 1];
   const lastEl = tileEls.get(last.id);
+  const finalValue = closestPowerOfTwo(chainSum(chainOrder));
 
   chain = [];
   updateChainVisuals();
   hideHoverRing();
   boardAnimating = true;
 
-  // Replay the same cascading pairwise-merge algorithm as chainSum(), but this
-  // time tracking DOM elements so we can animate each pairwise merge visually,
-  // in order, as it happens (2+2 -> 4, then that 4 + the next 4 -> 8, ...).
-  const stack = [];
+  // Animate the running total climbing as each other tile in the chain flies
+  // into the release point, one at a time in order, finishing with a snap to
+  // the nearest power of two.
+  const others = chainOrder.slice(0, -1);
   const steps = [];
-  for (const t of chainOrder) {
-    let cur = { value: t.value, el: tileEls.get(t.id) };
-    while (stack.length && stack[stack.length - 1].value === cur.value) {
-      const prev = stack.pop();
-      steps.push({ fromEl: prev.el, ontoEl: cur.el, newValue: cur.value * 2 });
-      cur = { value: cur.value * 2, el: cur.el };
-    }
-    stack.push(cur);
+  let running = last.value;
+  for (const t of others) {
+    running += t.value;
+    steps.push({ fromEl: tileEls.get(t.id), ontoEl: lastEl, displayValue: running });
   }
-
-  // The stack doesn't always collapse to a single entry (e.g. an odd-length
-  // same-value run like 2-2-2 leaves one leftover) — anything not already
-  // sitting on lastEl visually collapses into it, so the result always ends
-  // up displayed exactly where the player released their finger.
-  for (const entry of stack) {
-    if (entry.el !== lastEl) {
-      steps.push({ fromEl: entry.el, ontoEl: lastEl, newValue: finalValue });
-    }
-  }
-  const finalStep = steps[steps.length - 1];
-  if (!finalStep || finalStep.ontoEl !== lastEl || finalStep.newValue !== finalValue) {
-    steps.push({ fromEl: null, ontoEl: lastEl, newValue: finalValue });
+  if (!steps.length || steps[steps.length - 1].displayValue !== finalValue) {
+    steps.push({ fromEl: null, ontoEl: lastEl, displayValue: finalValue });
   }
 
   let stepIndex = 0;
@@ -514,8 +482,8 @@ function performMerge() {
       step.fromEl.classList.add("removing");
     }
     if (step.ontoEl) {
-      step.ontoEl.textContent = String(step.newValue);
-      const bg = valueColor(step.newValue);
+      step.ontoEl.textContent = String(step.displayValue);
+      const bg = valueColor(step.displayValue);
       step.ontoEl.style.background = bg;
       step.ontoEl.style.color = textColorFor(bg);
       markPopEl(step.ontoEl);
