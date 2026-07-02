@@ -332,7 +332,7 @@
       <button id="dismissErrorBtn" type="button" aria-label="Dismiss">&times;</button>
     </div>
     <div class="composer">
-      <textarea id="messageInput" placeholder="Write your ideas here…" maxlength="4000"></textarea>
+      <textarea id="messageInput" placeholder="Write your ideas here…" maxlength="3900"></textarea>
       <button id="sendBtn">Send</button>
     </div>
   </div>
@@ -514,10 +514,20 @@
       for (var i = 0; i < comments.length; i++) {
         var m = comments[i].body.match(MARKER);
         if (!m) continue;
+        var text = comments[i].body.slice(m[0].length);
+        // Messages may end with a deploy-version stamp like [v0.57] — pull it
+        // out of the text and show it in the byline instead.
+        var version = null;
+        var vm = text.match(/\s*\[(v[\d.]+)\]\s*$/);
+        if (vm) {
+          version = vm[1];
+          text = text.slice(0, vm.index);
+        }
         messages.push({
           who: m[1],
           fromClaude: m[1].toLowerCase() === "claude",
-          text: comments[i].body.slice(m[0].length),
+          text: text,
+          version: version,
           when: comments[i].created_at,
         });
       }
@@ -548,7 +558,8 @@
         bubble.className = "bubble " + (msg.fromClaude ? "claude" : "visitor");
         var who = document.createElement("span");
         who.className = "who";
-        who.textContent = msg.who + " · " + friendlyTime(msg.when);
+        who.textContent =
+          msg.who + (msg.version ? " · " + msg.version : "") + " · " + friendlyTime(msg.when);
         bubble.appendChild(who);
         bubble.appendChild(document.createTextNode(msg.text));
         threadEl.appendChild(bubble);
@@ -617,9 +628,12 @@
     sendBtn.addEventListener("click", function () {
       var text = messageInput.value.trim();
       if (!text) return;
+      // Stamp the message with the deploy version this page was sent from,
+      // so the thread records who was on what version when.
+      var stamped = window.APP_VERSION ? text + "\n\n[" + window.APP_VERSION + "]" : text;
       sendBtn.disabled = true;
       sendBtn.textContent = "Sending…";
-      relay({ action: "post", name: visitorName, secret: secretWord, message: text })
+      relay({ action: "post", name: visitorName, secret: secretWord, message: stamped })
         .then(function (res) {
           return res
             .json()
