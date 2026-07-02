@@ -1,7 +1,7 @@
 const COLS = 5;
 const ROWS = 8;
 const GAP = 4;
-const MILESTONES = [2248, 4096, 8192, 16384, 32768, 65536, 131072];
+const MILESTONES = [2048, 4096, 8192, 16384, 32768, 65536, 131072];
 const BEST_SCORE_KEY = "hayleysgame_best";
 const STATE_KEY = "hayleysgame_state";
 const DIRS = [
@@ -44,24 +44,45 @@ let gameOver = false;
 let boardAnimating = false;
 let layoutPending = false;
 let nextMilestoneIndex = 0;
-let minSpawnTier = 2;
+let tierShifts = 0;
 
-// New tiles spawn as one of 4 consecutive power-of-two tiers starting at the
-// current floor (e.g. 2/4/8/16). Each tier is exactly twice as likely as the
-// next (2 is 2x as likely as 4, 4 is 2x as likely as 8, ...): a geometric
-// weighting of 8/15, 4/15, 2/15, 1/15. Once every tile of the floor value
-// clears off the board, the whole window slides up a tier (floor doubles, so
-// the window becomes 4/8/16/32, etc). Used for both the initial board fill
-// and ongoing gravity refills, since both go through randomValue().
-const SPAWN_WEIGHTS = [8 / 15, 4 / 15, 2 / 15, 1 / 15];
+// Tiles spawn as one of 7 consecutive power-of-two tiers, all equally
+// likely — 2 through 128 to start. Used for both the initial board fill and
+// ongoing gravity refills, since both go through randomValue().
+//
+// Creating the milestone block shifts the whole window up a tier: at 2048
+// every 2 clears off the board and stops spawning while 256 starts falling
+// (window becomes 4-256); at 16384 the 4s clear and 512 arrives; and so on,
+// each milestone 8x the last (2048, 16384, 131072, ...).
+const SPAWN_TIERS = 7;
+const FIRST_SHIFT_MILESTONE = 2048;
+
+function spawnFloor() {
+  return 2 ** (1 + tierShifts);
+}
+
+function nextShiftMilestone() {
+  return FIRST_SHIFT_MILESTONE * 8 ** tierShifts;
+}
 
 function randomValue() {
-  let roll = Math.random();
-  for (let i = 0; i < SPAWN_WEIGHTS.length; i++) {
-    roll -= SPAWN_WEIGHTS[i];
-    if (roll < 0) return minSpawnTier * 2 ** i;
+  return spawnFloor() * 2 ** Math.floor(Math.random() * SPAWN_TIERS);
+}
+
+// Called with each merge result. If it reached the milestone, retire the
+// smallest tier: every tile of that value vanishes from the board (gravity
+// then refills from the new, shifted window). Loops in case a single merge
+// blows past more than one milestone.
+function applyTierShifts(value) {
+  while (value >= nextShiftMilestone()) {
+    const retiring = spawnFloor();
+    tierShifts++;
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        if (grid[r][c] && grid[r][c].value === retiring) grid[r][c] = null;
+      }
+    }
   }
-  return minSpawnTier * 2 ** (SPAWN_WEIGHTS.length - 1);
 }
 
 function chainSum(ch) {
@@ -119,16 +140,6 @@ function textColorFor(bg) {
   return luminance > 0.6 ? "#2d2d2d" : "#ffffff";
 }
 
-function boardHasValue(value) {
-  return grid.some((row) => row.some((t) => t && t.value === value));
-}
-
-function updateMinSpawnTier() {
-  while (!boardHasValue(minSpawnTier) && minSpawnTier < 2 ** 30) {
-    minSpawnTier *= 2;
-  }
-}
-
 // Every chain has to start with two equal adjacent tiles — canFollow's sum
 // condition means a lone tile can only ever reach a same-valued neighbor
 // (chainSum([t]) === t.value, so nextValue can be no bigger than t.value,
@@ -168,7 +179,7 @@ function resetGame() {
   chain = [];
   dragging = false;
   nextMilestoneIndex = 0;
-  minSpawnTier = 2;
+  tierShifts = 0;
   overlayEl.classList.remove("visible");
   tilesEl.innerHTML = "";
   tileEls.clear();
@@ -189,9 +200,15 @@ function resumeGame(state) {
   grid = state.grid.map((row) =>
     row.map((v) => (v === null ? null : { id: nextId++, value: v }))
   );
-  minSpawnTier = 2;
-  updateMinSpawnTier();
   const highestTile = grid.flat().reduce((max, t) => (t ? Math.max(max, t.value) : max), 0);
+  if (typeof state.tierShifts === "number") {
+    tierShifts = state.tierShifts;
+  } else {
+    // Older saves don't record shifts — derive from the biggest tile ever
+    // made (each milestone is 8x the last).
+    tierShifts = 0;
+    while (highestTile >= nextShiftMilestone()) tierShifts++;
+  }
   nextMilestoneIndex = MILESTONES.findIndex((m) => m > highestTile);
   if (nextMilestoneIndex === -1) nextMilestoneIndex = MILESTONES.length;
   updateScoreDisplay();
@@ -211,6 +228,7 @@ function saveProgress() {
   try {
     const state = {
       score,
+      tierShifts,
       grid: grid.map((row) => row.map((cell) => (cell ? cell.value : null))),
     };
     localStorage.setItem(STATE_KEY, JSON.stringify(state));
@@ -721,7 +739,7 @@ function performMerge() {
     score += finalValue;
     updateScoreDisplay();
 
-    updateMinSpawnTier();
+    applyTierShifts(finalValue);
     applyGravity();
     renderTiles(true, last.id);
 

@@ -8,6 +8,8 @@ they're written down here.
 ## The board
 
 - 5 columns × 8 rows, always full of tiles.
+- The board starts as a random mix of 2 through 128 (all seven sizes
+  equally likely).
 - When tiles merge away, the tiles above fall down and brand-new tiles
   drop in from the top.
 
@@ -33,15 +35,15 @@ they're written down here.
 
 ## Smallest and biggest tiles
 
-- New tiles spawn from a window of 4 sizes starting at the current
-  **floor** — at first 2/4/8/16 — with small ones most likely
-  (chances 8/4/2/1 out of 15).
-- When the last floor-value tile leaves the board, the floor doubles
-  (new tiles become 4/8/16/32, then 8/16/32/64, …). The floor never
-  goes back down until you restart.
+- New tiles fall from the top as one of **7 sizes, all equally likely** —
+  2 through 128 to start.
+- **Milestone blocks retire the smallest size**: the moment a **2048** is
+  created, every 2 vanishes from the board, 2s stop falling, and **256**
+  joins the falling rotation (window becomes 4–256). At **16384** the 4s
+  vanish and 512 arrives (8–512). The pattern repeats forever, each
+  milestone 8× the last (2048, 16384, 131072, …).
 - There is **no biggest tile** — values can grow forever. Milestone
-  celebrations fire at 2248 (probably meant to be 2048 — known typo),
-  4096, 8192, and each doubling up to 131072.
+  celebrations fire at 2048, 4096, 8192, and each doubling up to 131072.
 
 ## Game over
 
