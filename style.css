@@ -185,6 +185,18 @@ body {
   100% { transform: scale(1); }
 }
 
+/* A retiring tile swells, then bursts. */
+.tile.exploding {
+  animation: explode 0.26s ease forwards;
+  z-index: 8;
+}
+
+@keyframes explode {
+  0% { transform: scale(1); opacity: 1; }
+  55% { transform: scale(1.35); opacity: 1; }
+  100% { transform: scale(1.9); opacity: 0; }
+}
+
 .overlay {
   position: fixed;
   inset: 0;
