@@ -24,8 +24,39 @@
       color: #fff;
       text-align: center;
     }
+    .club-header { position: relative; }
     .club-header h1 { margin: 0; font-size: 1.15rem; }
     .club-header .sub { font-size: 0.72rem; opacity: 0.75; margin-top: 2px; }
+    .logout-btn {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(255, 255, 255, 0.12);
+      border: none;
+      color: #fff;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 7px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .secret-field { position: relative; }
+    .secret-field input { padding-right: 46px; }
+    .secret-field button {
+      position: absolute;
+      right: 4px;
+      top: 4px;
+      bottom: 16px;
+      width: 38px;
+      border: none;
+      border-radius: 7px;
+      background: #eee4da;
+      font-size: 1rem;
+      cursor: pointer;
+      padding: 0;
+    }
+    .secret-field button.peeking { background: #f2b179; }
 
     /* ---- entry gate ---- */
     .gate {
@@ -165,6 +196,7 @@
 </head>
 <body>
   <header class="club-header">
+    <button class="logout-btn" id="logoutBtn" hidden>Leave</button>
     <h1>🏰 The Clubhouse</h1>
     <div class="sub">a secret place to talk about Hayley's Game</div>
   </header>
@@ -174,7 +206,10 @@
       <h2>Who goes there?</h2>
       <p>Sign your name and whisper the secret word.</p>
       <input id="nameInput" type="text" placeholder="Your name" autocomplete="off" maxlength="40" />
-      <input id="secretInput" type="password" placeholder="Secret word" autocomplete="off" maxlength="60" />
+      <div class="secret-field">
+        <input id="secretInput" type="password" placeholder="Secret word" autocomplete="off" maxlength="60" />
+        <button id="peekBtn" type="button" aria-label="Show secret word">👁</button>
+      </div>
       <button id="enterBtn">Enter the clubhouse</button>
       <div class="gate-error" id="gateError"></div>
     </div>
@@ -227,27 +262,48 @@
       });
     }
 
-    enterBtn.addEventListener("click", function () {
-      var name = nameInput.value.trim();
-      var secret = secretInput.value.trim();
-      gateErrorEl.classList.remove("visible");
-      if (!name) return showGateError("You have to sign your name!");
-      if (!secret) return showGateError("You have to whisper the secret word!");
-      if (!WORKER_URL) return showGateError("The clubhouse isn't wired up yet — come back soon.");
+    var LOGIN_KEY = "clubhouse_login";
+    var logoutBtn = document.getElementById("logoutBtn");
+    var peekBtn = document.getElementById("peekBtn");
 
+    peekBtn.addEventListener("click", function () {
+      var showing = secretInput.type === "text";
+      secretInput.type = showing ? "password" : "text";
+      peekBtn.classList.toggle("peeking", !showing);
+      peekBtn.setAttribute("aria-label", showing ? "Show secret word" : "Hide secret word");
+    });
+
+    function openClubhouse(name, secret) {
+      visitorName = name;
+      secretWord = secret;
+      try {
+        localStorage.setItem(LOGIN_KEY, JSON.stringify({ name: name, secret: secret }));
+      } catch (e) {}
+      gateEl.style.display = "none";
+      threadWrapEl.classList.add("visible");
+      logoutBtn.hidden = false;
+      startPolling();
+    }
+
+    function enterClubhouse(name, secret, fromSavedLogin) {
       enterBtn.disabled = true;
       enterBtn.textContent = "Checking…";
       relay({ action: "verify", secret: secret })
         .then(function (res) {
           if (res.status === 403) throw new Error("wrong-secret");
           if (!res.ok) throw new Error("relay");
-          visitorName = name;
-          secretWord = secret;
-          gateEl.style.display = "none";
-          threadWrapEl.classList.add("visible");
-          startPolling();
+          openClubhouse(name, secret);
         })
         .catch(function (err) {
+          if (fromSavedLogin) {
+            // A remembered login that stopped working (changed password,
+            // offline) falls back to the gate without an alarming error.
+            if (err.message === "wrong-secret") {
+              try { localStorage.removeItem(LOGIN_KEY); } catch (e) {}
+            }
+            nameInput.value = name;
+            return;
+          }
           showGateError(
             err.message === "wrong-secret"
               ? "That's not the secret word. Try again!"
@@ -258,7 +314,41 @@
           enterBtn.disabled = false;
           enterBtn.textContent = "Enter the clubhouse";
         });
+    }
+
+    enterBtn.addEventListener("click", function () {
+      var name = nameInput.value.trim();
+      var secret = secretInput.value.trim();
+      gateErrorEl.classList.remove("visible");
+      if (!name) return showGateError("You have to sign your name!");
+      if (!secret) return showGateError("You have to whisper the secret word!");
+      if (!WORKER_URL) return showGateError("The clubhouse isn't wired up yet — come back soon.");
+      enterClubhouse(name, secret, false);
     });
+
+    logoutBtn.addEventListener("click", function () {
+      try { localStorage.removeItem(LOGIN_KEY); } catch (e) {}
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = null;
+      visitorName = "";
+      secretWord = "";
+      logoutBtn.hidden = true;
+      threadWrapEl.classList.remove("visible");
+      gateEl.style.display = "flex";
+      nameInput.value = "";
+      secretInput.value = "";
+      secretInput.type = "password";
+      peekBtn.classList.remove("peeking");
+    });
+
+    // Walk straight in if this device already knows the secret handshake.
+    (function () {
+      var saved = null;
+      try { saved = JSON.parse(localStorage.getItem(LOGIN_KEY)); } catch (e) {}
+      if (saved && saved.name && saved.secret && WORKER_URL) {
+        enterClubhouse(saved.name, saved.secret, true);
+      }
+    })();
 
     // Comments are chat messages only if they start with "**<name> says:**".
     // Claude's replies use the name Claude; everything else renders as a
