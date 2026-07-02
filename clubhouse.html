@@ -41,11 +41,13 @@
       padding: 7px 12px;
       border-radius: 8px;
     }
-    .logout-btn {
+    .logout-wrap {
       position: absolute;
       right: 12px;
       top: 50%;
       transform: translateY(-50%);
+    }
+    .logout-btn {
       background: rgba(255, 255, 255, 0.12);
       border: none;
       color: #fff;
@@ -55,6 +57,37 @@
       border-radius: 8px;
       cursor: pointer;
     }
+    .logout-confirm {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      background: #fff;
+      color: #2f3b52;
+      border-radius: 10px;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+      padding: 10px 12px;
+      min-width: 140px;
+      z-index: 20;
+    }
+    .logout-confirm[hidden] { display: none; }
+    .logout-confirm-text {
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+    .logout-confirm-actions { display: flex; gap: 8px; }
+    .logout-confirm-actions button {
+      flex: 1 1 auto;
+      border: none;
+      border-radius: 7px;
+      padding: 7px 0;
+      font-weight: 700;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+    #logoutYesBtn { background: #ef5350; color: #fff; }
+    #logoutNoBtn { background: #eee4da; color: #2f3b52; }
     .secret-field { position: relative; margin: 0 0 12px; }
     .secret-field input { margin: 0; padding-right: 44px; }
     .secret-field button {
@@ -249,7 +282,16 @@
 <body>
   <header class="club-header">
     <a class="game-btn" href="./">🎮 Game</a>
-    <button class="logout-btn" id="logoutBtn" hidden>Leave</button>
+    <div class="logout-wrap">
+      <button class="logout-btn" id="logoutBtn" hidden>Log out</button>
+      <div class="logout-confirm" id="logoutConfirm" hidden>
+        <div class="logout-confirm-text">Log out?</div>
+        <div class="logout-confirm-actions">
+          <button id="logoutYesBtn">Yes</button>
+          <button id="logoutNoBtn">No</button>
+        </div>
+      </div>
+    </div>
     <h1>🏰 The Clubhouse</h1>
     <div class="sub">a secret place to talk about Hayley's Game</div>
     <div class="version" id="versionStamp"></div>
@@ -416,7 +458,11 @@
       enterClubhouse(name, secret, false);
     });
 
-    logoutBtn.addEventListener("click", function () {
+    var logoutConfirmEl = document.getElementById("logoutConfirm");
+    var logoutYesBtn = document.getElementById("logoutYesBtn");
+    var logoutNoBtn = document.getElementById("logoutNoBtn");
+
+    function doLogout() {
       try { localStorage.removeItem(LOGIN_KEY); } catch (e) {}
       if (pollTimer) clearInterval(pollTimer);
       pollTimer = null;
@@ -429,6 +475,24 @@
       secretInput.value = "";
       secretInput.type = "password";
       setPeekIcons(false);
+    }
+
+    // Logging out clears the remembered secret, so a stray tap shouldn't be
+    // able to do it by itself — the button just opens a Yes/No confirm.
+    logoutBtn.addEventListener("click", function () {
+      logoutConfirmEl.hidden = false;
+    });
+    logoutYesBtn.addEventListener("click", function () {
+      logoutConfirmEl.hidden = true;
+      doLogout();
+    });
+    logoutNoBtn.addEventListener("click", function () {
+      logoutConfirmEl.hidden = true;
+    });
+    document.addEventListener("click", function (e) {
+      if (logoutConfirmEl.hidden) return;
+      if (e.target === logoutBtn || logoutConfirmEl.contains(e.target)) return;
+      logoutConfirmEl.hidden = true;
     });
 
     // Walk straight in if this device already knows the secret handshake.

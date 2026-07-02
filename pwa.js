@@ -5,7 +5,7 @@
     });
   }
 
-  // Secret clubhouse entrance: triple-tap the invisible top-right corner.
+  // Secret clubhouse entrance: triple-tap the invisible top-left corner.
   var secretDoor = document.getElementById('secretDoor');
   if (secretDoor) {
     var taps = 0;
