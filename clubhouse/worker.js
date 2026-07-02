@@ -34,7 +34,17 @@ export default {
       return new Response(null, { status: 204, headers: CORS_HEADERS });
     }
     if (request.method !== "POST") {
-      return json(405, { error: "POST only" });
+      // Visiting the relay URL in a browser shows which version is deployed
+      // and whether its settings are present (never their values).
+      return json(200, {
+        relay: "r3",
+        settings: {
+          SECRET_WORD: env.SECRET_WORD ? "set" : "MISSING",
+          GITHUB_TOKEN: env.GITHUB_TOKEN ? "set" : "MISSING",
+          REPO: env.REPO || "MISSING",
+          PR_NUMBER: env.PR_NUMBER || "MISSING",
+        },
+      });
     }
 
     let payload;
@@ -80,7 +90,9 @@ export default {
           const body = await res.json();
           detail = body.message ? ` — ${body.message}` : "";
         } catch {}
-        return json(502, { error: `github said ${res.status}${detail}` });
+        return json(502, {
+          error: `github said ${res.status}${detail} [target: ${env.REPO}#${env.PR_NUMBER}] [relay r3]`,
+        });
       }
       return json(200, { ok: true });
     }
