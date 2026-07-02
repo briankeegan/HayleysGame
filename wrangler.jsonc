@@ -2,7 +2,7 @@
 // connected as a Cloudflare Workers project (deploy command: npx wrangler deploy).
 // The game itself is NOT served by Cloudflare — it lives on GitHub Pages.
 {
-  "name": "hayleys-clubhouse",
+  "name": "sdsgame",
   "main": "clubhouse/worker.js",
   "compatibility_date": "2025-01-01"
 }
