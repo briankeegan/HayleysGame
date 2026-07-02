@@ -9,11 +9,28 @@
 <body>
   <header class="app-header">
     <h1>Hayley's Game</h1>
+    <div class="hud">
+      <div class="stat">Score<br /><span id="score">0</span></div>
+      <div class="stat">Best<br /><span id="best">0</span></div>
+      <button id="restartBtn" class="restart-btn">Restart</button>
+    </div>
   </header>
 
   <main class="board" id="board">
-    <!-- Draggable blocks -->
+    <div class="grid" id="grid">
+      <div class="cells" id="cells"></div>
+      <svg class="chain-line" id="chainLine"></svg>
+      <div class="tiles" id="tiles"></div>
+    </div>
   </main>
+
+  <div class="overlay" id="overlay">
+    <div class="overlay-panel">
+      <h2 id="overlayTitle">Game Over</h2>
+      <p id="overlayText"></p>
+      <button id="playAgainBtn">Play Again</button>
+    </div>
+  </div>
 
   <script src="app.js"></script>
 </body>
